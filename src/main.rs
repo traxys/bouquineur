@@ -76,9 +76,11 @@ struct Config {
     server: ServerConfig,
 }
 
+type PgPool = diesel_async::pooled_connection::deadpool::Pool<AsyncPgConnection>;
+
 struct AppState {
     config: Config,
-    db: AsyncPgConnection,
+    db: PgPool,
 }
 
 #[tokio::main]
@@ -104,9 +106,15 @@ async fn main() -> anyhow::Result<()> {
         anyhow::bail!("No configuration was supplied");
     };
 
-    let db = AsyncPgConnection::establish(&cfg.database.url)
-        .await
-        .with_context(|| format!("While connecting to the database at {}", cfg.database.url))?;
+    if let Some(user) = &cfg.debug.assume_user {
+        tracing::warn!("Running in debug mode, user is assumed to be '{user}'");
+    }
+
+    let pool_config =
+        AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(&cfg.database.url);
+    let db = Pool::builder(pool_config)
+        .build()
+        .with_context(|| "Could not build database pool")?;
 
     let port = cfg.server.port;
 

@@ -1,11 +1,50 @@
+use std::sync::Arc;
+
+use axum::{async_trait, extract::FromRequestParts, http::StatusCode, response::IntoResponse};
+use diesel::prelude::*;
+use diesel_async::pooled_connection::deadpool::PoolError;
+use diesel_async::RunQueryDsl;
 use maud::{html, Markup};
 
-use crate::State;
+use crate::{
+    models::{NewUser, User},
+    schema::users,
+    AppState, State,
+};
 
 #[derive(thiserror::Error, Debug)]
-enum RouteError {
+pub(crate) enum RouteError {
     #[error("Database error")]
     Db(#[from] diesel::result::Error),
+    #[error("Missing a user header")]
+    NoUser,
+    #[error("Could not parse user name")]
+    InvalidUser(#[from] axum::http::header::ToStrError),
+    #[error("Could not get a connection from the pool")]
+    PoolError(#[from] PoolError),
+}
+
+impl IntoResponse for RouteError {
+    fn into_response(self) -> axum::response::Response {
+        tracing::error!("route error: {self:#?}");
+        let (code, text) = match self {
+            // Don't reveal the missing authenitication header to the client, this is a
+            // mis-configuration that could be exploited
+            RouteError::Db(_) | RouteError::NoUser | RouteError::PoolError(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error")
+            }
+            RouteError::InvalidUser(_) => (StatusCode::BAD_REQUEST, "Invalid user name"),
+        };
+
+        (
+            code,
+            base_page(html! {
+                h1 { "Fatal Error encountered" }
+                p { (text) }
+            }),
+        )
+            .into_response()
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -90,7 +129,41 @@ fn app_page(body: Markup, page: Page) -> Markup {
     })
 }
 
-pub async fn index(state: State) -> maud::Markup {
+#[async_trait]
+impl FromRequestParts<Arc<AppState>> for User {
+    type Rejection = RouteError;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Self::Rejection> {
+        let user = match parts.headers.get(&state.config.auth.header) {
+            Some(user) => user.to_str()?,
+            None if state.config.debug.assume_user.is_some() => {
+                state.config.debug.assume_user.as_deref().unwrap()
+            }
+            None => {
+                return Err(RouteError::NoUser);
+            }
+        };
+
+        let mut conn = state.db.get().await?;
+
+        diesel::insert_into(users::table)
+            .values(&NewUser { name: user })
+            .on_conflict_do_nothing()
+            .execute(&mut conn)
+            .await?;
+
+        Ok(users::table
+            .filter(users::name.eq(user))
+            .select(User::as_select())
+            .first(&mut conn)
+            .await?)
+    }
+}
+
+pub(crate) async fn index(state: State, user: User) -> maud::Markup {
     app_page(
         html! {
             p { "Hello!" }
