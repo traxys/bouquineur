@@ -6,8 +6,13 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-diesel = { version = "2.2.2", features = ["postgres"] }
+axum = "0.7.5"
+diesel = { version = "2.2.2", features = ["postgres", "uuid"] }
 diesel-async = { version = "0.5.0", features = ["postgres"] }
+maud = { version = "0.26.0", features = ["axum"] }
 serde = { version = "1.0.204", features = ["derive"] }
+thiserror = "1.0.63"
 tokio = { version = "1.39.2", features = ["full"] }
 toml = "0.8.19"
+tracing-subscriber = { version = "0.3.18", features = ["tracing-log"] }
+uuid = "1.10.0"

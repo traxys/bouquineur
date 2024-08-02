@@ -28,7 +28,12 @@
       in
       {
         devShell = pkgs.mkShell {
-          nativeBuildInputs = [ rust ] ++ (with pkgs; [ diesel-cli ]);
+          nativeBuildInputs =
+            [ rust ]
+            ++ (with pkgs; [
+              diesel-cli
+              calibre
+            ]);
           RUST_PATH = "${rust}";
           RUST_DOC_PATH = "${rust}/share/doc/rust/html/std/index.html";
 
@@ -36,6 +41,7 @@
             export PROJECT_ROOT=$(realpath .)
             export BOUQUINEUR_CONFIG=$PROJECT_ROOT/config.toml
             export DATABASE_URL=postgres://@/bouquineur
+            export RUST_LOG=debug
           '';
         };
 
