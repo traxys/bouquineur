@@ -1,8 +1,12 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use anyhow::Context;
-use axum::{routing::get, Router};
-use diesel_async::{AsyncConnection, AsyncPgConnection};
+use axum::{http::HeaderName, routing::get, Router};
+use diesel_async::{
+    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
+    AsyncConnection, AsyncPgConnection,
+};
+use serde::Deserializer;
 
 mod models;
 mod routes;
@@ -10,35 +14,60 @@ mod schema;
 
 type State = axum::extract::State<Arc<AppState>>;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+fn deserialize_hdr<'de, D>(de: D) -> Result<HeaderName, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StrVisitor;
+    impl<'de> serde::de::Visitor<'de> for StrVisitor {
+        type Value = HeaderName;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "an HTTP header name")
+        }
+
+        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            HeaderName::from_str(s)
+                .map_err(|_| serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self))
+        }
+    }
+
+    de.deserialize_str(StrVisitor)
+}
+
+#[derive(serde::Deserialize, Debug)]
 struct AuthConfig {
-    header: String,
+    #[serde(deserialize_with = "deserialize_hdr")]
+    header: HeaderName,
     #[serde(default)]
     admin: Vec<String>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+#[derive(serde::Deserialize, Debug, Default)]
 struct DebugConfig {
     #[serde(default)]
     assume_user: Option<String>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 struct DatabaseConfig {
     url: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 struct MetadataConfig {
     fetcher: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 struct ServerConfig {
     port: u16,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 struct Config {
     #[serde(default)]
     debug: DebugConfig,
