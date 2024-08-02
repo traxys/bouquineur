@@ -31,6 +31,11 @@
           nativeBuildInputs = [ rust ];
           RUST_PATH = "${rust}";
           RUST_DOC_PATH = "${rust}/share/doc/rust/html/std/index.html";
+
+          shellHook = ''
+            export PROJECT_ROOT=$(realpath .)
+            export BOUQUINEUR_CONFIG=$PROJECT_ROOT/config.toml
+          '';
         };
 
         defaultPackage = naersk'.buildPackage ./.;
