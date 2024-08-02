@@ -17,7 +17,8 @@ CREATE TABLE book (
 	goodreadsId TEXT,
 	amazonId TEXT,
 	librarythingId TEXT,
-	pageCount INT
+	pageCount INT,
+	UNIQUE (owner, isbn)
 );
 
 CREATE TABLE bookAuthor (
