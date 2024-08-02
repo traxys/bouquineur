@@ -107,11 +107,21 @@ fn base_page(body: Markup) -> Markup {
     base_page_with_head(body, None)
 }
 
-fn app_page(body: Markup, page: Page) -> Markup {
+fn app_page(page: Page, user: &User, body: Markup) -> Markup {
     base_page(html! {
         .container-fluid {
-            header .d-flex.justify-content-center."py-3" {
-                ul .nav.nav-pills {
+            header .d-flex
+                   .flex-wrap
+                   .align-items-center
+                   .justify-content-center
+                   .justify-content-md-between
+                   ."py-3"."mb-4" {
+                h2 ."col-md-3"."mb-2"."mb-md-0" {
+                    a .d-inline-flex.link-body-emphasis.text-decoration-none href="/" {
+                        i .bi.bi-book-half {}
+                    }
+                }
+                ul .nav.nav-pills."col-12".col-md-auto."mb-2".justify-content-center."mb-md-0" {
                     @for p in Page::variants() {
                         @let current = *p == page;
                         li .nav-item {
@@ -122,6 +132,9 @@ fn app_page(body: Markup, page: Page) -> Markup {
                             }
                         }
                     }
+                }
+                ."col-md-3".text-end."me-2" {
+                    span .align-middle { (user.name) }
                 }
             }
             (body)
@@ -165,9 +178,10 @@ impl FromRequestParts<Arc<AppState>> for User {
 
 pub(crate) async fn index(state: State, user: User) -> maud::Markup {
     app_page(
-        html! {
-            p { "Hello!" }
-        },
         Page::Books,
+        &user,
+        html! {
+            p { "Hello, " (user.name) "!" }
+        },
     )
 }
