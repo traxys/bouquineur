@@ -22,14 +22,24 @@ CREATE TABLE book (
 	UNIQUE (owner, isbn)
 );
 
+CREATE TABLE author (
+	id SERIAL PRIMARY KEY,
+	name TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE bookAuthor (
 	book uuid NOT NULL REFERENCES book(id),
-	name TEXT NOT NULL,
-	PRIMARY KEY (book, name)
+	author INT NOT NULL REFERENCES author(id),
+	PRIMARY KEY (book, author)
+);
+
+CREATE TABLE tag (
+	id SERIAL PRIMARY KEY,
+	name TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE bookTag (
 	book uuid NOT NULL REFERENCES book(id),
-	tag TEXT NOT NULL,
+	tag INT NOT NULL REFERENCES tag(id),
 	PRIMARY KEY (book, tag)
 );

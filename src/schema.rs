@@ -1,6 +1,13 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    author (id) {
+        id -> Int4,
+        name -> Text,
+    }
+}
+
+diesel::table! {
     book (id) {
         id -> Uuid,
         owner -> Uuid,
@@ -20,16 +27,23 @@ diesel::table! {
 }
 
 diesel::table! {
-    bookauthor (book, name) {
+    bookauthor (book, author) {
         book -> Uuid,
-        name -> Text,
+        author -> Int4,
     }
 }
 
 diesel::table! {
     booktag (book, tag) {
         book -> Uuid,
-        tag -> Text,
+        tag -> Int4,
+    }
+}
+
+diesel::table! {
+    tag (id) {
+        id -> Int4,
+        name -> Text,
     }
 }
 
@@ -41,12 +55,16 @@ diesel::table! {
 }
 
 diesel::joinable!(book -> users (owner));
+diesel::joinable!(bookauthor -> author (author));
 diesel::joinable!(bookauthor -> book (book));
 diesel::joinable!(booktag -> book (book));
+diesel::joinable!(booktag -> tag (tag));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    author,
     book,
     bookauthor,
     booktag,
+    tag,
     users,
 );
