@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use axum::{
     async_trait,
@@ -6,6 +6,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use base64::prelude::*;
 use diesel::prelude::*;
 use diesel_async::pooled_connection::deadpool::PoolError;
 use diesel_async::RunQueryDsl;
@@ -200,8 +201,90 @@ pub(crate) async fn index(state: State, user: User) -> maud::Markup {
     )
 }
 
+static NO_COVER: LazyLock<String> = LazyLock::new(|| {
+    let image = include_bytes!("../no_cover.jpg");
+    BASE64_STANDARD.encode(image)
+});
+
 fn book_form(details: NullableBookDetails) -> maud::Markup {
-    html! { form { "TODO" } }
+    let image = details
+        .covert_art_b64
+        .as_ref()
+        .unwrap_or_else(|| &*NO_COVER);
+
+    html! { form .container-sm.align-items-center method="POST" .mt-2 {
+        .text-center.d-flex.flex-column."mb-2" {
+            label for="coverArtInput" .form-label {"Cover art"}
+            div {
+                img .img-fluid."mb-2"
+                    #coverArt
+                    style="height:400px;"
+                    alt="Cover Art"
+                    src=(format!("data:image/jpg;base64,{image}"));
+            }
+            input .form-control accept="image/*" type="file" name="user_cover" #coverArtInput;
+            script {
+                (maud::PreEscaped(r#"
+                    coverArt = document.getElementById("coverArt")
+                    coverArtInput = document.getElementById("coverArtInput")
+            
+                    coverArtInput.onchange = evt => {
+                        const [file] = coverArtInput.files
+                        if (file) {
+                            coverArt.src = URL.createObjectURL(file)
+                        }
+                    }
+                "#))
+            }
+            @if let Some(b64) = details.covert_art_b64 {
+                input type="hidden" value=(b64) name="fetched_cover";
+            }
+        }
+        .form-floating."mb-2" {
+            input .form-control required #title name="title" type="text" placeholder="Title" value=[details.title];
+            label for="title" { "Title" }
+        }
+        .form-floating."mb-2" {
+            input .form-control required #isbn name="isbn" type="text" placeholder="ISBN" value=[details.isbn];
+            label for="isbn" { "ISBN" }
+        }
+        .form-floating."mb-2" {
+            textarea .form-control placeholder="Book summary" #summary style="height: 150px" {
+                (details.summary.unwrap_or_default())
+            }
+            label for="summary" { "Summary" }
+        }
+        .form-floating."mb-2" {
+            input #published name="published" type="date" .form-control placeholder="1970-01-01"
+                  value=[details.published.map(|d| d.format("%Y-%m-%d"))];
+            label for="published" {"Publication Date"}
+        }
+        .form-floating."mb-2" {
+            input .form-control #publisher name="publisher" type="text" placeholder="Publisher" value=[details.publisher];
+            label for="publisher" { "Publisher" }
+        }
+        .form-floating."mb-2" {
+            input .form-control #language name="language" type="text" placeholder="Language" value=[details.language];
+            label for="language" { "Language" }
+        }
+        .form-floating."mb-2" {
+            input .form-control #googleID name="google_id" type="text" placeholder="Google ID" value=[details.google_id];
+            label for="googleID" { "Google ID" }
+        }
+        .form-floating."mb-2" {
+            input .form-control #amazonID name="amazon_id" type="text" placeholder="Amazon ID" value=[details.amazon_id];
+            label for="amazonID" { "Amazon ID" }
+        }
+        .form-floating."mb-2" {
+            input .form-control #librarythingId name="librarything_id" type="text" placeholder="Librarything ID" value=[details.librarything_id];
+            label for="librarythingId" { "Librarything ID" }
+        }
+        .form-floating."mb-2" {
+            input .form-control #pageCount name="page_count" type="number" placeholder="Page Count" value=[details.page_count];
+            label for="pageCount" { "Page Count" }
+        }
+        input type="submit" .btn.btn-primary value="Add Book";
+    } }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
