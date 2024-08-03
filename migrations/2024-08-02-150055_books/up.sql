@@ -8,6 +8,7 @@ CREATE TABLE book (
 	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	owner uuid NOT NULL REFERENCES users(id),
 	isbn VARCHAR(17) NOT NULL,
+	title TEXT NOT NULL,
 	summary TEXT NOT NULL,
 -- Non required information
 	published DATE,

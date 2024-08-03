@@ -6,6 +6,7 @@ diesel::table! {
         owner -> Uuid,
         #[max_length = 17]
         isbn -> Varchar,
+        title -> Text,
         summary -> Text,
         published -> Nullable<Date>,
         publisher -> Nullable<Text>,
