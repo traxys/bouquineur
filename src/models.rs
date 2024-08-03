@@ -23,3 +23,4 @@ pub struct Book {
     pub id: Uuid,
     pub isbn: String,
 }
+

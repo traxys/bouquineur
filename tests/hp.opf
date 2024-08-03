@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">6d653ee8-e3a5-4b5a-80a1-4ee004654cd2</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">4ed6cde6-e8c4-47dd-817e-9701350df38a</dc:identifier>
+        <dc:title>Harry Potter and the Philosopher's Stone: MinaLima Edition</dc:title>
+        <dc:creator opf:file-as="Unknown" opf:role="aut">J. K. Rowling</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (7.15.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2020-08-15T13:31:06.194378+00:00</dc:date>
+        <dc:description>&lt;p&gt;An irresistible new edition of &lt;em&gt;Harry Potter and the Philosopher's Stone&lt;/em&gt; created with ultra-talented designers MinaLima, the design magicians behind the gorgeous visual graphic style of the Harry Potter and Fantastic Beasts films. J.K. Rowling's complete and unabridged text is accompanied by MinaLima's handsome colour illustrations on nearly every page, superb design, and eight exclusive interactive paper-engineered elements – including Harry's Hogwarts letter, the magical entrance to Diagon Alley, a sumptuous feast in the Great Hall of Hogwarts and more.  &lt;/p&gt;
+&lt;p&gt;Designed and illustrated by the iconic house of MinaLima – best known for establishing the graphic design of the Harry Potter and Fantastic Beasts films – this is the perfect gift for Harry Potter fans and a beautiful addition to any collector's bookshelf, enticing readers of all ages to discover the Harry Potter novels all over again.&lt;/p&gt;</dc:description>
+        <dc:publisher>BLOOMSBURY</dc:publisher>
+        <dc:identifier opf:scheme="GOOGLE">cmNSzQEACAAJ</dc:identifier>
+        <dc:identifier opf:scheme="ISBN">9781526626585</dc:identifier>
+        <dc:identifier opf:scheme="AMAZON">1526626586</dc:identifier>
+        <dc:language>eng</dc:language>
+        <dc:subject>Fiction</dc:subject>
+        <dc:subject>General</dc:subject>
+        <dc:subject>Fantasy</dc:subject>
+        <dc:subject>Juvenile Fiction</dc:subject>
+        <dc:subject>Action &amp; Adventure</dc:subject>
+        <dc:subject>Fantasy &amp; Magic</dc:subject>
+        <meta name="calibre:rating" content="5"/>
+    </metadata>
+    <guide/>
+</package>
+

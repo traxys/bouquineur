@@ -1,16 +1,24 @@
 use std::sync::Arc;
 
-use axum::{async_trait, extract::FromRequestParts, http::StatusCode, response::IntoResponse};
+use axum::{
+    async_trait,
+    extract::{FromRequestParts, Query},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use diesel::prelude::*;
 use diesel_async::pooled_connection::deadpool::PoolError;
 use diesel_async::RunQueryDsl;
 use maud::{html, Markup};
 
 use crate::{
+    metadata::{fetch_metadata, MetadataError, NullableBookDetails},
     models::{NewUser, User},
     schema::users,
     AppState, State,
 };
+
+mod icons;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum RouteError {
@@ -22,17 +30,20 @@ pub(crate) enum RouteError {
     InvalidUser(#[from] axum::http::header::ToStrError),
     #[error("Could not get a connection from the pool")]
     PoolError(#[from] PoolError),
+    #[error("Could not fetch metadata")]
+    Metadata(#[from] MetadataError),
 }
 
 impl IntoResponse for RouteError {
     fn into_response(self) -> axum::response::Response {
-        tracing::error!("route error: {self:#?}");
+        tracing::error!("route error: {self} ({self:#?})");
         let (code, text) = match self {
             // Don't reveal the missing authenitication header to the client, this is a
             // mis-configuration that could be exploited
-            RouteError::Db(_) | RouteError::NoUser | RouteError::PoolError(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error")
-            }
+            RouteError::Db(_)
+            | RouteError::NoUser
+            | RouteError::PoolError(_)
+            | RouteError::Metadata(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error"),
             RouteError::InvalidUser(_) => (StatusCode::BAD_REQUEST, "Invalid user name"),
         };
 
@@ -97,6 +108,9 @@ fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
                 (body)
                 script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
                        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+                       crossorigin="anonymous" {}
+                script src="https://unpkg.com/htmx.org@2.0.1"
+                       integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/"
                        crossorigin="anonymous" {}
             }
         }
@@ -184,4 +198,74 @@ pub(crate) async fn index(state: State, user: User) -> maud::Markup {
             p { "Hello, " (user.name) "!" }
         },
     )
+}
+
+fn book_form(details: NullableBookDetails) -> maud::Markup {
+    html! { form { "TODO" } }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct IsbnRequest {
+    isbn: Option<String>,
+}
+
+pub(crate) async fn add_book(
+    state: State,
+    user: User,
+    isbn: Query<IsbnRequest>,
+) -> Result<maud::Markup, RouteError> {
+    let (not_found, book_details) = match &isbn.isbn {
+        None => (false, (NullableBookDetails::default())),
+        Some(isbn) => fetch_metadata(&state.config, isbn)
+            .await?
+            .map(|v| (false, v))
+            .unwrap_or_else(|| (true, Default::default())),
+    };
+
+    Ok(app_page(
+        Page::AddBook,
+        &user,
+        html! {
+            #isbnModal .modal.fade tabindex="-1" aria-labelledby="isbnModalLabel" aria-hidden="true" {
+                .modal-dialog.modal-dialog-centered { .modal-content {
+                    .modal-header {
+                        h1 .modal-title."fs-5" #isbnModalLabel {"Load a book from an ISBN"}
+                        button type="button" .btn-close data-bs-dismiss="modal" aria-label="Cancel" {}
+                    }
+                    .modal-body {
+                        form #isbnModalForm {
+                            .form-floating {
+                                input name="isbn"
+                                        type="text"
+                                        .form-control
+                                        #isbnSearch
+                                        placeholder="978-3-16-148410-0";
+                                label for="isbnSearch" { "ISBN" }
+                            }
+                        }
+                    }
+                    .modal-footer {
+                        button type="button" .btn.btn-secondary data-bs-dismiss="modal" { "Cancel" }
+                        button type="submit" form="isbnModalForm" .btn.btn-primary { "Load" }
+                    }
+                }  }
+            }
+
+            @if not_found {
+                .alert.alert-warning role="alert" {
+                    "The requested ISBN was not found"
+                }
+            }
+
+            .d-flex.flex-column {
+                .d-flex.justify-content-center {
+                    button .btn.btn-primary.me-2 data-bs-toggle="modal" data-bs-target="#isbnModal" {
+                        (icons::bi_123()) "Load from ISBN"
+                    }
+                    button .btn.btn-primary { (icons::bi_upc_scan()) "Scan ISBN" }
+                }
+                (book_form(book_details))
+            }
+        },
+    ))
 }

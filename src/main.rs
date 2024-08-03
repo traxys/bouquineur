@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use anyhow::Context;
 use axum::{http::HeaderName, routing::get, Router};
@@ -8,6 +8,7 @@ use diesel_async::{
 };
 use serde::Deserializer;
 
+mod metadata;
 mod models;
 mod routes;
 mod schema;
@@ -60,6 +61,7 @@ struct DatabaseConfig {
 #[derive(serde::Deserialize, Debug)]
 struct MetadataConfig {
     fetcher: String,
+    image_dir: PathBuf,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -71,6 +73,7 @@ struct ServerConfig {
 struct Config {
     #[serde(default)]
     debug: DebugConfig,
+    metadata: MetadataConfig,
     auth: AuthConfig,
     database: DatabaseConfig,
     server: ServerConfig,
@@ -106,6 +109,9 @@ async fn main() -> anyhow::Result<()> {
         anyhow::bail!("No configuration was supplied");
     };
 
+    std::fs::create_dir_all(&cfg.metadata.image_dir)
+        .with_context(|| "Could not create image directory")?;
+
     if let Some(user) = &cfg.debug.assume_user {
         tracing::warn!("Running in debug mode, user is assumed to be '{user}'");
     }
@@ -122,6 +128,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(routes::index))
+        .route("/add", get(routes::add_book))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
