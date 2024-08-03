@@ -107,6 +107,12 @@ fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
             }
             body {
                 (body)
+                script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"
+                       integrity="sha384-yW9Y7lGkfKYN+jnhSQpcumEsBkSCx/Ab9s2+rHyU5faxR81n4c2mhBw1K6TyFG2a"
+                       crossorigin="anonymous" {}
+                script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"
+                       integrity="sha384-MOAlrmENITvPLnTzISP6k/GAbCgTOuREHSbC1X5a3qcIHeHTNilNuzc7LfXVYKMO"
+                       crossorigin="anonymous" {}
                 script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
                        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
                        crossorigin="anonymous" {}
@@ -334,6 +340,21 @@ pub(crate) async fn add_book(
                 }  }
             }
 
+            #scanModal .modal.fade tabindex="-1" aria-labelledby="scanModalLabel" aria-hidden="true" {
+                .modal-dialog.modal-dialog-centered { .modal-content {
+                    .modal-header {
+                        h1 .modal-title."fs-5" #scanModalLabel {"Load a book from an ISBN barcode"}
+                        button type="button" .btn-close data-bs-dismiss="modal" aria-label="Cancel" {}
+                    }
+                    .modal-body {
+                        video #scanVideo width="300" height="200" style="border: 1px solid gray" {}
+                    }
+                    .modal-footer {
+                        button type="button" .btn.btn-secondary data-bs-dismiss="modal" { "Cancel" }
+                    }
+                }  }
+            }
+
             @if not_found {
                 .alert.alert-warning role="alert" {
                     "The requested ISBN was not found"
@@ -345,9 +366,15 @@ pub(crate) async fn add_book(
                     button .btn.btn-primary.me-2 data-bs-toggle="modal" data-bs-target="#isbnModal" {
                         (icons::bi_123()) "Load from ISBN"
                     }
-                    button .btn.btn-primary { (icons::bi_upc_scan()) "Scan ISBN" }
+                    button .btn.btn-primary data-bs-toggle="modal" data-bs-target="#scanModal" {
+                        (icons::bi_upc_scan()) "Scan ISBN"
+                    }
                 }
-                (book_form(book_details))
+                (book_form(&state, &user, book_details).await?)
+            }
+
+            script {
+                (maud::PreEscaped(include_str!("./barcode.js")))
             }
         },
     ))
