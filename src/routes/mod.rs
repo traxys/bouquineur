@@ -22,10 +22,12 @@ use crate::{
 };
 
 mod add;
+mod get_author;
 mod get_book;
 mod icons;
 
 pub(crate) use add::{add_book, do_add_book};
+pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 
 #[derive(thiserror::Error, Debug)]
@@ -277,25 +279,29 @@ pub(crate) async fn image_not_found(_user: User) -> impl IntoResponse {
     ([(CONTENT_TYPE, "image/jpeg")], image)
 }
 
-pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, RouteError> {
+const NO_SORT: Option<fn(&BookPreview, &BookPreview) -> std::cmp::Ordering> = None;
+
+async fn book_cards_for<F>(
+    state: &State,
+    user: &User,
+    books: &[BookPreview],
+    sort_by: Option<F>,
+) -> Result<maud::Markup, RouteError>
+where
+    F: Fn(&BookPreview, &BookPreview) -> std::cmp::Ordering,
+{
     let mut conn = state.db.get().await?;
 
-    let all_books: Vec<BookPreview> = book::table
-        .filter(book::owner.eq(user.id))
-        .select(BookPreview::as_select())
-        .load(&mut conn)
-        .await?;
-
-    let authors = BookAuthor::belonging_to(&all_books)
+    let authors = BookAuthor::belonging_to(books)
         .inner_join(author::table)
         .select((BookAuthor::as_select(), Author::as_select()))
         .load::<(BookAuthor, Author)>(&mut conn)
         .await?;
 
-    let book_data: Vec<_> = authors
-        .grouped_by(&all_books)
+    let mut book_data: Vec<_> = authors
+        .grouped_by(books)
         .into_iter()
-        .zip(all_books)
+        .zip(books)
         .map(|(a, book)| {
             let image_path = state
                 .config
@@ -305,8 +311,8 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
                 .join(format!("{}.jpg", book.id));
 
             let image_url = match image_path.exists() {
-                true => format!("images/{}", book.id),
-                false => "images/not_found".to_string(),
+                true => format!("/images/{}", book.id),
+                false => "/images/not_found".to_string(),
             };
 
             Ok((
@@ -317,29 +323,31 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
         })
         .collect::<Result<_, RouteError>>()?;
 
-    Ok(app_page(
-        Page::Books,
-        &user,
-        html! {
-            .text-center {
-                h2 { "Books" }
-            }
-            .container {
-                .row.row-cols-auto.justify-content-center.justify-content-md-start {
-                    @for (book, image, authors) in book_data {
-                        ."col" {
-                            .card."h-100" style="width: 9.6rem;" {
-                                img src=(image) .card-img-top alt="book cover"
-                                    style="height: 14.4rem; width: 9.6rem;";
-                                .card-body {
-                                    h6 .card-title { 
-                                        a .link-light href=(format!("book/{}", book.id)) { (book.title) } 
+    if let Some(f) = sort_by {
+        book_data.sort_unstable_by(|(book_a, _, _), (book_b, _, _)| f(book_a, book_b));
+    }
+
+    Ok(html! {
+        .container {
+            .row.row-cols-auto.justify-content-center.justify-content-md-start {
+                @for (book, image, authors) in book_data {
+                    ."col"."mb-2" {
+                        .card."h-100" style="width: 9.6rem;" {
+                            img src=(image) .card-img-top alt="book cover"
+                                style="height: 14.4rem; width: 9.6rem;";
+                            .card-body {
+                                h6 .card-title {
+                                    a .nav-link.fs-5 href=(format!("/book/{}", book.id)) {
+                                        (book.title)
                                     }
-                                    p .card-text {
-                                        @for (i, author) in authors.iter().enumerate() {
-                                            @if i != 0 {
-                                                ", "
-                                            }
+                                }
+                                p .card-text {
+                                    @for (i, author) in authors.iter().enumerate() {
+                                        @if i != 0 {
+                                            ", "
+                                        }
+                                        a href=(format!("/author/{}", author.id))
+                                          .nav-link {
                                             (author.name)
                                         }
                                     }
@@ -348,6 +356,31 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
                         }
                     }
                 }
+            }
+        }
+    })
+}
+
+pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, RouteError> {
+    let mut conn = state.db.get().await?;
+
+    let all_books: Vec<BookPreview> = book::table
+        .filter(book::owner.eq(user.id))
+        .select(BookPreview::as_select())
+        .load(&mut conn)
+        .await?;
+
+    drop(conn);
+
+    let book_data = book_cards_for(&state, &user, &all_books, NO_SORT).await?;
+
+    Ok(app_page(
+        Page::Books,
+        &user,
+        html! {
+            .text-center {
+                h2 { "Books" }
+                (book_data)
             }
         },
     ))

@@ -99,6 +99,7 @@ pub struct BookPreview {
     pub owner: Uuid,
     pub isbn: String,
     pub title: String,
+    pub published: Option<NaiveDate>,
 }
 
 #[derive(Selectable, Queryable, Identifiable)]

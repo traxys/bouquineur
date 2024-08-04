@@ -5,7 +5,7 @@ use maud::{html, PreEscaped};
 use uuid::Uuid;
 
 use crate::{
-    models::{BookAuthor, BookComplete, BookTag, User},
+    models::{Author, BookAuthor, BookComplete, BookTag, User},
     schema::{author, book, tag},
     State,
 };
@@ -46,8 +46,8 @@ pub(crate) async fn get_book(
 
     let authors = BookAuthor::belonging_to(&book)
         .inner_join(author::table)
-        .select(author::name)
-        .load::<String>(&mut conn)
+        .select(Author::as_select())
+        .load::<Author>(&mut conn)
         .await?;
 
     let tags = BookTag::belonging_to(&book)
@@ -70,7 +70,12 @@ pub(crate) async fn get_book(
                         @if i != 0 {
                             ", "
                         }
-                        span .fs-4 { (author) }
+                        span .fs-4 { 
+                            a .link-light.link-offset-1 
+                                href=(format!("/author/{}", author.id)) { 
+                                (author.name)   
+                            } 
+                        }
                     }
                     br;
                     @for tag in tags {
