@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use base64::prelude::*;
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use chrono::NaiveDate;
 
 use crate::Config;
@@ -126,6 +126,9 @@ pub async fn fetch_metadata(
         .output()
         .await
         .map_err(MetadataError::Launch)?;
+
+    tracing::debug!("Stdout:\n{}", output.stderr.as_bstr());
+    tracing::debug!("Stderr:\n{}", output.stderr.as_bstr());
 
     if !output.status.success() {
         return Err(MetadataError::FetchFailure {
