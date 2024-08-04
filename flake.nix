@@ -44,7 +44,10 @@
           '';
         };
 
-        defaultPackage = naersk'.buildPackage ./.;
+        packages.default = naersk'.buildPackage {
+          src = ./.;
+          buildInputs = with pkgs; [ postgresql.lib ];
+        };
       }
     );
 }
