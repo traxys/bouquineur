@@ -12,6 +12,7 @@ bstr = "1.10.0"
 chrono = "0.4.38"
 diesel = { version = "2.2.2", features = ["chrono", "postgres", "uuid"] }
 diesel-async = { version = "0.5.0", features = ["deadpool", "postgres"] }
+diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 image = "0.25.2"
 maud = { version = "0.26.0", features = ["axum"] }
 roxmltree = { version = "0.20.0", default-features = false, features = ["std"] }

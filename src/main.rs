@@ -2,10 +2,12 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use anyhow::Context;
 use axum::{http::HeaderName, routing::get, Router};
+use diesel::Connection;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use serde::Deserializer;
 
 mod metadata;
@@ -86,6 +88,17 @@ struct AppState {
     db: PgPool,
 }
 
+fn run_migrations(state: &AppState) -> anyhow::Result<()> {
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
+
+    let mut conn = diesel::PgConnection::establish(&state.config.database.url)?;
+
+    conn.run_pending_migrations(MIGRATIONS)
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
@@ -125,6 +138,8 @@ async fn main() -> anyhow::Result<()> {
     let port = cfg.server.port;
 
     let state = Arc::new(AppState { config: cfg, db });
+
+    run_migrations(&state)?;
 
     let app = Router::new()
         .route("/", get(routes::index))
