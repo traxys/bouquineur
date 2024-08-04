@@ -322,19 +322,22 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
             .text-center {
                 h2 { "Books" }
             }
-            .row.row-cols-auto {
-                @for (book, image, authors) in book_data {
-                    ."col" {
-                        .card."h-100" style="width: 9.6rem;" {
-                            img src=(image) .card-img-top alt="book cover" style="height: 14.4rem; width: 9.6rem;";
-                            .card-body {
-                                h6 .card-title { (book.title) }
-                                p .card-text {
-                                    @for (i, author) in authors.iter().enumerate() {
-                                        @if i != 0 {
-                                            ", "
+            .container {
+                .row.row-cols-auto.justify-content-center.justify-content-md-start {
+                    @for (book, image, authors) in book_data {
+                        ."col" {
+                            .card."h-100" style="width: 9.6rem;" {
+                                img src=(image) .card-img-top alt="book cover" 
+                                    style="height: 14.4rem; width: 9.6rem;";
+                                .card-body {
+                                    h6 .card-title { (book.title) }
+                                    p .card-text {
+                                        @for (i, author) in authors.iter().enumerate() {
+                                            @if i != 0 {
+                                                ", "
+                                            }
+                                            (author.name)
                                         }
-                                        (author.name)
                                     }
                                 }
                             }
