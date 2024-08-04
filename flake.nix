@@ -41,7 +41,6 @@
             export PROJECT_ROOT=$(realpath .)
             export BOUQUINEUR_CONFIG=$PROJECT_ROOT/config.toml
             export DATABASE_URL=postgres://@/bouquineur
-            export RUST_LOG=debug
           '';
         };
 

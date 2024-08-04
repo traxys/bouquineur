@@ -19,11 +19,12 @@ pub struct User {
     pub id: Uuid,
 }
 
-#[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::book)]
+#[derive(Queryable, Selectable, Identifiable, PartialEq, Debug)]
+#[diesel(table_name = crate::schema::author)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct BookId {
-    pub id: Uuid,
+pub struct Author {
+    pub id: i32,
+    pub name: String,
 }
 
 #[derive(Insertable, AsExpression, Debug)]
@@ -47,9 +48,12 @@ where
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Identifiable, Selectable, Queryable, Associations, Debug)]
+#[diesel(belongs_to(BookPreview, foreign_key = book))]
+#[diesel(belongs_to(Author, foreign_key = author))]
 #[diesel(table_name = crate::schema::bookauthor)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(primary_key(book, author))]
 pub struct BookAuthor {
     pub book: Uuid,
     pub author: i32,
@@ -82,6 +86,16 @@ where
 pub struct BookTag {
     pub book: Uuid,
     pub tag: i32,
+}
+
+#[derive(Queryable, Selectable, Identifiable, Debug)]
+#[diesel(table_name = crate::schema::book)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct BookPreview {
+    pub id: Uuid,
+    pub owner: Uuid,
+    pub isbn: String,
+    pub title: String,
 }
 
 #[derive(Insertable)]

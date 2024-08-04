@@ -2,19 +2,22 @@ use std::{num::ParseIntError, sync::Arc};
 
 use axum::{
     async_trait,
-    extract::{multipart::MultipartError, FromRequestParts},
-    http::StatusCode,
+    body::Body,
+    extract::{multipart::MultipartError, FromRequestParts, Path},
+    http::{header::CONTENT_TYPE, StatusCode},
     response::IntoResponse,
 };
 use diesel::prelude::*;
 use diesel_async::pooled_connection::deadpool::PoolError;
 use diesel_async::RunQueryDsl;
 use maud::{html, Markup};
+use tokio_util::io::ReaderStream;
+use uuid::Uuid;
 
 use crate::{
     metadata::MetadataError,
-    models::{NewUser, User},
-    schema::users,
+    models::{Author, BookAuthor, BookPreview, NewUser, User},
+    schema::{author, book, users},
     AppState, State,
 };
 
@@ -51,6 +54,10 @@ pub(crate) enum RouteError {
     ImageSave(#[source] image::ImageError),
     #[error("Invalid fetched image")]
     B64(#[from] base64::DecodeError),
+    #[error("Resource not found")]
+    NotFound,
+    #[error("Unexpected IO error")]
+    IO(#[from] std::io::Error),
 }
 
 impl IntoResponse for RouteError {
@@ -64,9 +71,8 @@ impl IntoResponse for RouteError {
             | RouteError::PoolError(_)
             | RouteError::Metadata(_)
             | RouteError::B64(_)
-            | RouteError::ImageSave(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into())
-            }
+            | RouteError::ImageSave(_)
+            | RouteError::IO(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into()),
             RouteError::InvalidUser(_) => (StatusCode::BAD_REQUEST, "Invalid user name".into()),
             RouteError::MultipartError(e) => (e.status(), e.body_text()),
             RouteError::DateError(e) => (StatusCode::BAD_REQUEST, e.to_string()),
@@ -74,6 +80,7 @@ impl IntoResponse for RouteError {
             RouteError::MissingField => (StatusCode::BAD_REQUEST, "Missing field in form".into()),
             RouteError::ImageDetection(e) => (StatusCode::BAD_REQUEST, e.to_string()),
             RouteError::Image(e) => (StatusCode::BAD_REQUEST, e.to_string()),
+            RouteError::NotFound => (StatusCode::NOT_FOUND, "Resource not found".into()),
         };
 
         (
@@ -239,12 +246,102 @@ impl FromRequestParts<Arc<AppState>> for User {
     }
 }
 
-pub(crate) async fn index(state: State, user: User) -> maud::Markup {
-    app_page(
+pub(crate) async fn image(
+    state: State,
+    user: User,
+    book_id: Path<Uuid>,
+) -> Result<impl IntoResponse, RouteError> {
+    let image_path = state
+        .config
+        .metadata
+        .image_dir
+        .join(user.id.to_string())
+        .join(format!("{}.jpg", *book_id));
+
+    if !image_path.exists() {
+        return Err(RouteError::NotFound);
+    }
+
+    let file = tokio::fs::File::open(image_path).await?;
+    let stream = ReaderStream::new(file);
+    let body = Body::from_stream(stream);
+
+    Ok(([(CONTENT_TYPE, "image/jpeg")], body).into_response())
+}
+
+pub(crate) async fn image_not_found(_user: User) -> impl IntoResponse {
+    let image = include_bytes!("../no_cover.jpg");
+
+    ([(CONTENT_TYPE, "image/jpeg")], image)
+}
+
+pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, RouteError> {
+    let mut conn = state.db.get().await?;
+
+    let all_books: Vec<BookPreview> = book::table
+        .filter(book::owner.eq(user.id))
+        .select(BookPreview::as_select())
+        .load(&mut conn)
+        .await?;
+
+    let authors = BookAuthor::belonging_to(&all_books)
+        .inner_join(author::table)
+        .select((BookAuthor::as_select(), Author::as_select()))
+        .load::<(BookAuthor, Author)>(&mut conn)
+        .await?;
+
+    let book_data: Vec<_> = authors
+        .grouped_by(&all_books)
+        .into_iter()
+        .zip(all_books)
+        .map(|(a, book)| {
+            let image_path = state
+                .config
+                .metadata
+                .image_dir
+                .join(user.id.to_string())
+                .join(format!("{}.jpg", book.id));
+
+            let image_url = match image_path.exists() {
+                true => format!("images/{}", book.id),
+                false => "images/not_found".to_string(),
+            };
+
+            Ok((
+                book,
+                image_url,
+                a.into_iter().map(|(_, author)| author).collect::<Vec<_>>(),
+            ))
+        })
+        .collect::<Result<_, RouteError>>()?;
+
+    Ok(app_page(
         Page::Books,
         &user,
         html! {
-            p { "Hello, " (user.name) "!" }
+            .text-center {
+                h2 { "Books" }
+            }
+            .row.row-cols-auto {
+                @for (book, image, authors) in book_data {
+                    ."col" {
+                        .card."h-100" style="width: 9.6rem;" {
+                            img src=(image) .card-img-top alt="book cover" style="height: 14.4rem; width: 9.6rem;";
+                            .card-body {
+                                h6 .card-title { (book.title) }
+                                p .card-text {
+                                    @for (i, author) in authors.iter().enumerate() {
+                                        @if i != 0 {
+                                            ", "
+                                        }
+                                        (author.name)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         },
-    )
+    ))
 }
