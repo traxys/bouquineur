@@ -127,7 +127,7 @@ pub async fn fetch_metadata(
         .await
         .map_err(MetadataError::Launch)?;
 
-    tracing::debug!("Stdout:\n{}", output.stderr.as_bstr());
+    tracing::debug!("Stdout:\n{}", output.stdout.as_bstr());
     tracing::debug!("Stderr:\n{}", output.stderr.as_bstr());
 
     if !output.status.success() {
