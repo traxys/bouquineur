@@ -22,9 +22,11 @@ use crate::{
 };
 
 mod add;
+mod get_book;
 mod icons;
 
 pub(crate) use add::{add_book, do_add_book};
+pub(crate) use get_book::get_book;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum RouteError {
@@ -327,10 +329,12 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
                     @for (book, image, authors) in book_data {
                         ."col" {
                             .card."h-100" style="width: 9.6rem;" {
-                                img src=(image) .card-img-top alt="book cover" 
+                                img src=(image) .card-img-top alt="book cover"
                                     style="height: 14.4rem; width: 9.6rem;";
                                 .card-body {
-                                    h6 .card-title { (book.title) }
+                                    h6 .card-title { 
+                                        a .link-light href=(format!("book/{}", book.id)) { (book.title) } 
+                                    }
                                     p .card-text {
                                         @for (i, author) in authors.iter().enumerate() {
                                             @if i != 0 {

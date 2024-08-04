@@ -5,6 +5,7 @@ authors = ["traxys <quentin@familleboyer.net>"]
 edition = "2021"
 
 [dependencies]
+ammonia = "4.0.0"
 anyhow = "1.0.86"
 axum = { version = "0.7.5", features = ["multipart", "query"] }
 base64 = "0.22.1"

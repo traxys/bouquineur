@@ -146,6 +146,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/add", get(routes::add_book).post(routes::do_add_book))
         .route("/images/not_found", get(routes::image_not_found))
         .route("/images/:id", get(routes::image))
+        .route("/book/:id", get(routes::get_book))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await

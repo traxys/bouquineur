@@ -50,6 +50,7 @@ where
 
 #[derive(Insertable, Identifiable, Selectable, Queryable, Associations, Debug)]
 #[diesel(belongs_to(BookPreview, foreign_key = book))]
+#[diesel(belongs_to(BookComplete, foreign_key = book))]
 #[diesel(belongs_to(Author, foreign_key = author))]
 #[diesel(table_name = crate::schema::bookauthor)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -80,9 +81,11 @@ where
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Associations, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = crate::schema::booktag)]
+#[diesel(belongs_to(BookComplete, foreign_key = book))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(primary_key(book, tag))]
 pub struct BookTag {
     pub book: Uuid,
     pub tag: i32,
@@ -98,7 +101,25 @@ pub struct BookPreview {
     pub title: String,
 }
 
-#[derive(Insertable)]
+#[derive(Selectable, Queryable, Identifiable)]
+#[diesel(table_name = crate::schema::book)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct BookComplete {
+    pub id: Uuid,
+    pub owner: Uuid,
+    pub isbn: String,
+    pub title: String,
+    pub summary: String,
+    pub published: Option<NaiveDate>,
+    pub publisher: Option<String>,
+    pub language: Option<String>,
+    pub googleid: Option<String>,
+    pub amazonid: Option<String>,
+    pub librarythingid: Option<String>,
+    pub pagecount: Option<i32>,
+}
+
+#[derive(Insertable, Selectable, Queryable)]
 #[diesel(table_name = crate::schema::book)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Book {
