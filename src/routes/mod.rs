@@ -101,6 +101,17 @@ fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
                      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
                      integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+"
                      crossorigin="anonymous";
+                link rel="stylesheet"
+                     href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.css"
+                     integrity="sha512-GEMEzu9K8wXXaW527IHfGIOaTQ0hXxZPJXZOwGDIO+nrR9Z0ttJih1ZehiEoWY8xPtqzzD7pxAEnQInTZwn3MQ=="
+                     crossorigin="anonymous";
+                style type="text/css" {
+                    (maud::PreEscaped(r#"
+                        .awesomplete > ul {
+	                        z-index: 10;
+                        }
+                    "#))
+                }
                 @if let Some(head) = head {
                     (head)
                 }
@@ -119,6 +130,9 @@ fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
                 script src="https://unpkg.com/htmx.org@2.0.1"
                        integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/"
                        crossorigin="anonymous" {}
+                script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.min.js"
+                       integrity="sha512-Pc3/aEr2FIVZhHxe0RAC9SFrd+pxBJHN3pNJfJNTKc2XAFnXUjgQGIh6X935ePSXNMN6rFa3yftxSnZfJE8ZAg=="
+                       crossorigin="anonymous" async {}
             }
         }
     }
@@ -212,7 +226,76 @@ static NO_COVER: LazyLock<String> = LazyLock::new(|| {
     BASE64_STANDARD.encode(image)
 });
 
-fn book_form(details: NullableBookDetails) -> maud::Markup {
+fn list_input(id: &str, placeholder: &str, defaults: &[String], remove_label: &str) -> maud::Markup {
+    let list_id = format!("{id}CompleteList");
+    let values_id = format!("{id}Values");
+    let input_id = format!("{id}Input");
+
+    html! {
+        input #(input_id) .form-control.awesomplete."mb-2" list=(list_id)
+            placeholder=(placeholder);
+        datalist #(list_id) {
+        }
+        ul #(values_id) .list-group."mb-3" {
+            @for item in defaults {
+                li .list-group-item.d-flex.justify-content-between.align-items-center {
+                    (item)
+                    span {
+                        button type="button" .btn-close aria-label=(remove_label) onclick=(format!("delete{id}(event)"));
+                    }
+                    input type="hidden" name=(id) value=(item);
+                }
+            }
+        }
+        script {
+            (maud::PreEscaped(format!(r#"
+                {id}Input = document.getElementById("{input_id}")
+                {id}List = document.getElementById("{values_id}")
+
+                function delete{id}(event) {{
+                    event.srcElement.parentNode.parentNode.remove()
+                }}
+                
+                {id}Input.addEventListener("keydown", function(event) {{
+                    if (event.key == "Enter") {{
+                        event.preventDefault();
+
+                        const value = {id}Input.value
+
+                        if (value == '')
+                            return
+
+                        const listItem = document.createElement("li")
+                        listItem.className = "list-group-item d-flex justify-content-between align-items-center"
+
+                        const valueEl = document.createTextNode(value);
+                        {id}Input.value = ''
+                        listItem.appendChild(valueEl)
+
+                        const removeSpan = document.createElement("span")
+                        const removeButton = document.createElement("button")
+                        removeButton.type = "button"
+                        removeButton.className = "btn-close"
+                        removeButton.ariaLabel = "{remove_label}"
+                        removeButton.addEventListener("click", delete{id})
+                        removeSpan.appendChild(removeButton)
+                        listItem.appendChild(removeSpan)
+
+                        const listInput = document.createElement("input")
+                        listInput.type = "hidden"
+                        listInput.name = "{id}"
+                        listInput.value = value
+                        listItem.appendChild(listInput)
+
+                        {id}List.appendChild(listItem)
+                    }}
+                }})
+            "#)))
+        }
+    }
+}
+
+async fn book_form(state: &State, user: &User, details: NullableBookDetails) -> maud::Markup {
     let image = details
         .covert_art_b64
         .as_ref()
@@ -247,11 +330,13 @@ fn book_form(details: NullableBookDetails) -> maud::Markup {
             }
         }
         .form-floating."mb-2" {
-            input .form-control required #title name="title" type="text" placeholder="Title" value=[details.title];
+            input .form-control required #title name="title" type="text"
+                    placeholder="Title" value=[details.title];
             label for="title" { "Title" }
         }
         .form-floating."mb-2" {
-            input .form-control required #isbn name="isbn" type="text" placeholder="ISBN" value=[details.isbn];
+            input .form-control required #isbn name="isbn" type="text"
+                    placeholder="ISBN" value=[details.isbn];
             label for="isbn" { "ISBN" }
         }
         .form-floating."mb-2" {
@@ -260,33 +345,41 @@ fn book_form(details: NullableBookDetails) -> maud::Markup {
             }
             label for="summary" { "Summary" }
         }
+        (list_input("author", "Author name", &details.authors, "Remove author"))
+        (list_input("tag", "Tag", &details.tags, "Remove tag"))
         .form-floating."mb-2" {
             input #published name="published" type="date" .form-control placeholder="1970-01-01"
                   value=[details.published.map(|d| d.format("%Y-%m-%d"))];
             label for="published" {"Publication Date"}
         }
         .form-floating."mb-2" {
-            input .form-control #publisher name="publisher" type="text" placeholder="Publisher" value=[details.publisher];
+            input .form-control #publisher name="publisher" type="text"
+                    placeholder="Publisher" value=[details.publisher];
             label for="publisher" { "Publisher" }
         }
         .form-floating."mb-2" {
-            input .form-control #language name="language" type="text" placeholder="Language" value=[details.language];
+            input .form-control #language name="language" type="text"
+                    placeholder="Language" value=[details.language];
             label for="language" { "Language" }
         }
         .form-floating."mb-2" {
-            input .form-control #googleID name="google_id" type="text" placeholder="Google ID" value=[details.google_id];
+            input .form-control #googleID name="google_id" type="text"
+                    placeholder="Google ID" value=[details.google_id];
             label for="googleID" { "Google ID" }
         }
         .form-floating."mb-2" {
-            input .form-control #amazonID name="amazon_id" type="text" placeholder="Amazon ID" value=[details.amazon_id];
+            input .form-control #amazonID name="amazon_id" type="text"
+                    placeholder="Amazon ID" value=[details.amazon_id];
             label for="amazonID" { "Amazon ID" }
         }
         .form-floating."mb-2" {
-            input .form-control #librarythingId name="librarything_id" type="text" placeholder="Librarything ID" value=[details.librarything_id];
+            input .form-control #librarythingId name="librarything_id" type="text"
+                    placeholder="Librarything ID" value=[details.librarything_id];
             label for="librarythingId" { "Librarything ID" }
         }
         .form-floating."mb-2" {
-            input .form-control #pageCount name="page_count" type="number" placeholder="Page Count" value=[details.page_count];
+            input .form-control #pageCount name="page_count" type="number"
+                    placeholder="Page Count" value=[details.page_count];
             label for="pageCount" { "Page Count" }
         }
         input type="submit" .btn.btn-primary value="Add Book";
@@ -370,7 +463,7 @@ pub(crate) async fn add_book(
                         (icons::bi_upc_scan()) "Scan ISBN"
                     }
                 }
-                (book_form(&state, &user, book_details).await?)
+                (book_form(&state, &user, book_details).await)
             }
 
             script {
