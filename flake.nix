@@ -47,6 +47,7 @@
         packages.default = naersk'.buildPackage {
           src = ./.;
           buildInputs = with pkgs; [ postgresql.lib ];
+          meta.mainProgram = "bouquineur";
         };
       }
     );
