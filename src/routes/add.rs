@@ -1,12 +1,20 @@
-use std::sync::LazyLock;
+use std::{io::Cursor, sync::LazyLock};
 
-use axum::extract::Query;
+use axum::{
+    body::Bytes,
+    extract::{Multipart, Query},
+};
 use base64::prelude::*;
+use chrono::NaiveDate;
+use diesel::prelude::*;
+use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use maud::html;
+use uuid::Uuid;
 
 use crate::{
     metadata::{fetch_metadata, NullableBookDetails},
-    models::User,
+    models::{AuthorName, Book, BookAuthor, BookTag, TagName, User},
+    schema::{author, book, bookauthor, booktag, tag},
 };
 
 use super::{app_page, icons, Page, RouteError, State};
@@ -96,7 +104,7 @@ async fn book_form(state: &State, user: &User, details: NullableBookDetails) -> 
         .as_ref()
         .unwrap_or_else(|| &*NO_COVER);
 
-    html! { form .container-sm.align-items-center method="POST" .mt-2 {
+    html! { form .container-sm.align-items-center method="POST" enctype="multipart/form-data" .mt-2 {
         .text-center.d-flex.flex-column."mb-2" {
             label for="coverArtInput" .form-label {"Cover art"}
             div {
@@ -135,7 +143,7 @@ async fn book_form(state: &State, user: &User, details: NullableBookDetails) -> 
             label for="isbn" { "ISBN" }
         }
         .form-floating."mb-2" {
-            textarea .form-control placeholder="Book summary" #summary style="height: 150px" {
+            textarea .form-control placeholder="Book summary" #summary style="height: 150px" name="summary" {
                 (details.summary.unwrap_or_default())
             }
             label for="summary" { "Summary" }
@@ -179,6 +187,202 @@ async fn book_form(state: &State, user: &User, details: NullableBookDetails) -> 
         }
         input type="submit" .btn.btn-primary value="Add Book";
     } }
+}
+
+pub(crate) async fn do_add_book(
+    state: State,
+    user: User,
+    mut multipart: Multipart,
+) -> Result<axum::response::Redirect, RouteError> {
+    enum CoverArt {
+        User(Bytes),
+        Fetched(String),
+    }
+
+    #[derive(Default)]
+    struct BookData {
+        cover_art: Option<CoverArt>,
+        title: Option<String>,
+        isbn: Option<String>,
+        summary: String,
+        authors: Vec<AuthorName>,
+        tags: Vec<TagName>,
+        publication_date: Option<NaiveDate>,
+        publisher: Option<String>,
+        language: Option<String>,
+        google_id: Option<String>,
+        amazon_id: Option<String>,
+        librarything_id: Option<String>,
+        page_count: Option<i32>,
+    }
+
+    let mut data = BookData::default();
+
+    let load = |s: String| if s.is_empty() { None } else { Some(s) };
+
+    while let Some(field) = multipart.next_field().await? {
+        let Some(name) = field.name() else {
+            tracing::warn!("Unamed multipart field");
+            continue;
+        };
+
+        match name {
+            "user_cover" => {
+                let cover = field.bytes().await?;
+                if !cover.is_empty() {
+                    data.cover_art = Some(CoverArt::User(cover));
+                }
+            }
+            "fetched_cover" => {
+                if data.cover_art.is_none() {
+                    data.cover_art = Some(CoverArt::Fetched(field.text().await?));
+                }
+            }
+            "title" => data.title = load(field.text().await?),
+            "isbn" => data.isbn = load(field.text().await?),
+            "summary" => data.summary = field.text().await?,
+            "author" => data.authors.push(AuthorName {
+                name: field.text().await?,
+            }),
+            "tag" => data.tags.push(TagName {
+                name: field.text().await?,
+            }),
+            "published" => {
+                let text = field.text().await?;
+                if !text.is_empty() {
+                    data.publication_date = Some(NaiveDate::parse_from_str(&text, "%Y-%m-%d")?)
+                }
+            }
+            "publisher" => data.publisher = load(field.text().await?),
+            "language" => data.language = load(field.text().await?),
+            "google_id" => data.google_id = load(field.text().await?),
+            "amazon_id" => data.amazon_id = load(field.text().await?),
+            "librarything_id" => data.librarything_id = load(field.text().await?),
+            "page_count" => {
+                let text = field.text().await?;
+                if !text.is_empty() {
+                    data.page_count = Some(text.parse()?)
+                }
+            }
+            _ => {
+                tracing::warn!("Unknown field {:?}", field.name());
+            }
+        }
+    }
+
+    let book = Book {
+        owner: user.id,
+        isbn: data.isbn.ok_or(RouteError::MissingField)?,
+        title: data.title.ok_or(RouteError::MissingField)?,
+        summary: data.summary,
+        published: data.publication_date,
+        publisher: data.publisher,
+        language: data.language,
+        googleid: data.google_id,
+        amazonid: data.amazon_id,
+        librarythingid: data.librarything_id,
+        pagecount: data.page_count,
+    };
+
+    let mut conn = state.db.get().await?;
+
+    let image = match data.cover_art {
+        Some(CoverArt::User(bytes)) => Some(
+            image::ImageReader::new(Cursor::new(bytes))
+                .with_guessed_format()
+                .map_err(RouteError::ImageDetection)?
+                .decode()?,
+        ),
+        Some(CoverArt::Fetched(data)) => {
+            let data = BASE64_STANDARD.decode(data)?;
+
+            Some(
+                image::ImageReader::new(Cursor::new(data))
+                    .with_guessed_format()
+                    .map_err(RouteError::ImageDetection)?
+                    .decode()?,
+            )
+        }
+        None => None,
+    };
+
+    conn.transaction(|c| {
+        async {
+            diesel::insert_into(author::table)
+                .values(&data.authors)
+                .on_conflict_do_nothing()
+                .execute(c)
+                .await?;
+
+            diesel::insert_into(tag::table)
+                .values(&data.tags)
+                .on_conflict_do_nothing()
+                .execute(c)
+                .await?;
+
+            let book_id: Uuid = diesel::insert_into(book::table)
+                .values(book)
+                .returning(book::id)
+                .get_result(c)
+                .await?;
+
+            let author_ids: Vec<i32> = author::table
+                .filter(author::name.eq_any(&data.authors))
+                .select(author::id)
+                .load(c)
+                .await?;
+
+            diesel::insert_into(bookauthor::table)
+                .values(
+                    &author_ids
+                        .into_iter()
+                        .map(|author| BookAuthor {
+                            book: book_id,
+                            author,
+                        })
+                        .collect::<Vec<_>>(),
+                )
+                .execute(c)
+                .await?;
+
+            let tag_ids: Vec<i32> = tag::table
+                .filter(tag::name.eq_any(&data.tags))
+                .select(tag::id)
+                .load(c)
+                .await?;
+
+            diesel::insert_into(booktag::table)
+                .values(
+                    &tag_ids
+                        .into_iter()
+                        .map(|tag| BookTag { book: book_id, tag })
+                        .collect::<Vec<_>>(),
+                )
+                .execute(c)
+                .await?;
+
+            let image_dir = state.config.metadata.image_dir.join(user.id.to_string());
+
+            std::fs::create_dir_all(&image_dir)
+                .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
+
+            let mut image_path = image_dir.join(book_id.to_string());
+            image_path.set_extension("jpg");
+
+            if let Some(img) = image {
+                tokio::task::block_in_place(|| -> Result<_, RouteError> {
+                    img.save(image_path).map_err(RouteError::ImageSave)?;
+                    Ok(())
+                })?;
+            }
+
+            Ok::<_, RouteError>(())
+        }
+        .scope_boxed()
+    })
+    .await?;
+
+    Ok(axum::response::Redirect::to("/"))
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

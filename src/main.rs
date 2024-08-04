@@ -4,7 +4,7 @@ use anyhow::Context;
 use axum::{http::HeaderName, routing::get, Router};
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
-    AsyncConnection, AsyncPgConnection,
+    AsyncPgConnection,
 };
 use serde::Deserializer;
 
@@ -128,7 +128,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(routes::index))
-        .route("/add", get(routes::add_book))
+        .route("/add", get(routes::add_book).post(routes::do_add_book))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await

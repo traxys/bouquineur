@@ -1,6 +1,11 @@
-use std::sync::Arc;
+use std::{num::ParseIntError, sync::Arc};
 
-use axum::{async_trait, extract::FromRequestParts, http::StatusCode, response::IntoResponse};
+use axum::{
+    async_trait,
+    extract::{multipart::MultipartError, FromRequestParts},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use diesel::prelude::*;
 use diesel_async::pooled_connection::deadpool::PoolError;
 use diesel_async::RunQueryDsl;
@@ -16,7 +21,7 @@ use crate::{
 mod add;
 mod icons;
 
-pub(crate) use add::add_book;
+pub(crate) use add::{add_book, do_add_book};
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum RouteError {
@@ -30,6 +35,22 @@ pub(crate) enum RouteError {
     PoolError(#[from] PoolError),
     #[error("Could not fetch metadata")]
     Metadata(#[from] MetadataError),
+    #[error("Error while handling multipart field")]
+    MultipartError(#[from] MultipartError),
+    #[error("Invalid date supplied")]
+    DateError(#[from] chrono::ParseError),
+    #[error("Invalid integer supplied")]
+    ParseInt(#[from] ParseIntError),
+    #[error("Missing field in form")]
+    MissingField,
+    #[error("Could not parse image type")]
+    ImageDetection(#[source] std::io::Error),
+    #[error("Could not parse image")]
+    Image(#[from] image::ImageError),
+    #[error("Could not save image")]
+    ImageSave(#[source] image::ImageError),
+    #[error("Invalid fetched image")]
+    B64(#[from] base64::DecodeError),
 }
 
 impl IntoResponse for RouteError {
@@ -41,8 +62,18 @@ impl IntoResponse for RouteError {
             RouteError::Db(_)
             | RouteError::NoUser
             | RouteError::PoolError(_)
-            | RouteError::Metadata(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error"),
-            RouteError::InvalidUser(_) => (StatusCode::BAD_REQUEST, "Invalid user name"),
+            | RouteError::Metadata(_)
+            | RouteError::B64(_)
+            | RouteError::ImageSave(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into())
+            }
+            RouteError::InvalidUser(_) => (StatusCode::BAD_REQUEST, "Invalid user name".into()),
+            RouteError::MultipartError(e) => (e.status(), e.body_text()),
+            RouteError::DateError(e) => (StatusCode::BAD_REQUEST, e.to_string()),
+            RouteError::ParseInt(e) => (StatusCode::BAD_REQUEST, e.to_string()),
+            RouteError::MissingField => (StatusCode::BAD_REQUEST, "Missing field in form".into()),
+            RouteError::ImageDetection(e) => (StatusCode::BAD_REQUEST, e.to_string()),
+            RouteError::Image(e) => (StatusCode::BAD_REQUEST, e.to_string()),
         };
 
         (
