@@ -12,7 +12,7 @@ use maud::html;
 use uuid::Uuid;
 
 use crate::{
-    metadata::{fetch_metadata, NullableBookDetails},
+    metadata::{fetch_metadata, MetadataProvider, NullableBookDetails},
     models::{AuthorName, Book, BookAuthor, BookTag, TagName, User},
     schema::{author, book, bookauthor, booktag, tag},
 };
@@ -464,7 +464,7 @@ pub(crate) async fn add_book(
 ) -> Result<maud::Markup, RouteError> {
     let (not_found, book_details) = match &isbn.isbn {
         None => (false, (NullableBookDetails::default())),
-        Some(isbn) => fetch_metadata(&state.config, isbn)
+        Some(isbn) => fetch_metadata(&state.config, isbn, MetadataProvider::Calibre)
             .await?
             .map(|v| (false, v))
             .unwrap_or_else(|| (true, Default::default())),

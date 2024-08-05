@@ -2,12 +2,13 @@ use std::io::Read;
 
 use base64::prelude::*;
 use bstr::{BString, ByteSlice};
-use chrono::NaiveDate;
 
 use crate::Config;
 
+use super::NullableBookDetails;
+
 #[derive(Debug, thiserror::Error)]
-pub enum MetadataError {
+pub enum CalibreMetadataError {
     #[error("Could not launch metadata fetcher")]
     Launch(#[source] std::io::Error),
     #[error("Response is not a valid utf-8 document")]
@@ -22,27 +23,10 @@ pub enum MetadataError {
     FetchFailure { stdout: BString, stderr: BString },
 }
 
-#[derive(Default, Debug, PartialEq, Eq)]
-pub struct NullableBookDetails {
-    pub isbn: Option<String>,
-    pub title: Option<String>,
-    pub authors: Vec<String>,
-    pub tags: Vec<String>,
-    pub summary: Option<String>,
-    pub published: Option<NaiveDate>,
-    pub publisher: Option<String>,
-    pub language: Option<String>,
-    pub google_id: Option<String>,
-    pub amazon_id: Option<String>,
-    pub librarything_id: Option<String>,
-    pub page_count: Option<i32>,
-    pub covert_art_b64: Option<String>,
-}
-
 fn parse_opf(
     document: &str,
     cover_art: &[u8],
-) -> Result<Option<NullableBookDetails>, MetadataError> {
+) -> Result<Option<NullableBookDetails>, CalibreMetadataError> {
     let document = roxmltree::Document::parse(document)?;
 
     let Some(metadata) = document
@@ -106,16 +90,16 @@ fn parse_opf(
     }))
 }
 
-pub async fn fetch_metadata(
+pub(super) async fn fetch_metadata(
     config: &Config,
     isbn: &str,
-) -> Result<Option<NullableBookDetails>, MetadataError> {
+) -> Result<Option<NullableBookDetails>, CalibreMetadataError> {
     tracing::debug!("Fetching metadata for isbn '{isbn}'");
 
     let mut tmp_file = tempfile::Builder::new()
         .suffix(".jpg")
         .tempfile()
-        .map_err(MetadataError::CoverArt)?;
+        .map_err(CalibreMetadataError::CoverArt)?;
 
     let output = tokio::process::Command::new(&config.metadata.fetcher)
         .arg("--isbn")
@@ -125,23 +109,23 @@ pub async fn fetch_metadata(
         .arg(tmp_file.path())
         .output()
         .await
-        .map_err(MetadataError::Launch)?;
+        .map_err(CalibreMetadataError::Launch)?;
 
     tracing::debug!("Stdout:\n{}", output.stdout.as_bstr());
     tracing::debug!("Stderr:\n{}", output.stderr.as_bstr());
 
     if !output.status.success() {
-        return Err(MetadataError::FetchFailure {
+        return Err(CalibreMetadataError::FetchFailure {
             stderr: output.stderr.into(),
             stdout: output.stdout.into(),
         });
     }
 
-    let image = tokio::task::block_in_place(|| -> Result<_, MetadataError> {
+    let image = tokio::task::block_in_place(|| -> Result<_, CalibreMetadataError> {
         let mut image = Vec::new();
         tmp_file
             .read_to_end(&mut image)
-            .map_err(MetadataError::CoverArt)?;
+            .map_err(CalibreMetadataError::CoverArt)?;
         Ok(image)
     })?;
 
@@ -154,7 +138,7 @@ mod test {
 
     #[test]
     fn hp() {
-        let document = include_str!("../tests/hp.opf");
+        let document = include_str!("../../tests/hp.opf");
 
         let actual = super::parse_opf(document, &[]).unwrap().unwrap();
         let expected = expect![[r#"
