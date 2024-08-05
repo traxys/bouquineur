@@ -474,9 +474,7 @@ pub(crate) async fn add_book(
             state
                 .config
                 .metadata
-                .providers
-                .as_ref()
-                .map(|v| v[0])
+                .default_provider
                 .unwrap_or(MetadataProvider::Calibre),
         )
         .await?

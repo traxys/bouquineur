@@ -75,6 +75,8 @@ struct OpenLibraryConfig {
 struct MetadataConfig {
     #[serde(default)]
     providers: Option<Vec<MetadataProvider>>,
+    #[serde(default)]
+    default_provider: Option<MetadataProvider>,
     image_dir: PathBuf,
 
     #[serde(default)]
@@ -167,6 +169,25 @@ async fn main() -> anyhow::Result<()> {
 
     cfg.metadata.check_calibre()?;
     cfg.metadata.check_openlibrary()?;
+
+    if let Some(p) = &cfg.metadata.providers {
+        match &cfg.metadata.default_provider {
+            None => {
+                if p.len() > 1 {
+                    anyhow::bail!(
+                        "When more than one providers are enabled a default must be chosen"
+                    )
+                }
+            }
+            Some(def) => {
+                if !p.contains(def) {
+                    anyhow::bail!(
+                        "metadata.default_provider ({def:?}) must be present in metadata.providers"
+                    )
+                }
+            }
+        }
+    }
 
     std::fs::create_dir_all(&cfg.metadata.image_dir)
         .with_context(|| "Could not create image directory")?;
