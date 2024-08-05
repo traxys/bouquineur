@@ -468,12 +468,20 @@ pub(crate) async fn add_book(
     };
 
     let (not_found, book_details) = match &isbn.isbn {
-        Some(isbn) if has_provider => {
-            fetch_metadata(&state.config, isbn, MetadataProvider::Calibre)
-                .await?
-                .map(|v| (false, v))
-                .unwrap_or_else(|| (true, Default::default()))
-        }
+        Some(isbn) if has_provider => fetch_metadata(
+            &state.config,
+            isbn,
+            state
+                .config
+                .metadata
+                .providers
+                .as_ref()
+                .map(|v| v[0])
+                .unwrap_or(MetadataProvider::Calibre),
+        )
+        .await?
+        .map(|v| (false, v))
+        .unwrap_or_else(|| (true, Default::default())),
         _ => (false, (NullableBookDetails::default())),
     };
 

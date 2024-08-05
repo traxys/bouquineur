@@ -67,6 +67,11 @@ struct CalibreConfig {
 }
 
 #[derive(serde::Deserialize, Debug)]
+struct OpenLibraryConfig {
+    contact: String,
+}
+
+#[derive(serde::Deserialize, Debug)]
 struct MetadataConfig {
     #[serde(default)]
     providers: Option<Vec<MetadataProvider>>,
@@ -74,6 +79,8 @@ struct MetadataConfig {
 
     #[serde(default)]
     calibre: Option<CalibreConfig>,
+    #[serde(default)]
+    open_library: Option<OpenLibraryConfig>,
 }
 
 impl MetadataConfig {
@@ -85,6 +92,18 @@ impl MetadataConfig {
 
         match has && self.calibre.is_none() {
             true => Err(anyhow!("Missing `[metadata.calibre]`")),
+            false => Ok(()),
+        }
+    }
+
+    fn check_openlibrary(&self) -> anyhow::Result<()> {
+        let has = match &self.providers {
+            None => true,
+            Some(v) => v.contains(&MetadataProvider::OpenLibrary),
+        };
+
+        match has && self.open_library.is_none() {
+            true => Err(anyhow!("Missing `[metadata.open_library]`")),
             false => Ok(()),
         }
     }
@@ -147,6 +166,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     cfg.metadata.check_calibre()?;
+    cfg.metadata.check_openlibrary()?;
 
     std::fs::create_dir_all(&cfg.metadata.image_dir)
         .with_context(|| "Could not create image directory")?;

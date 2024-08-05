@@ -3,6 +3,7 @@ use chrono::NaiveDate;
 use crate::Config;
 
 mod calibre;
+mod openlibrary;
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct NullableBookDetails {
@@ -25,11 +26,14 @@ pub struct NullableBookDetails {
 pub enum MetadataError {
     #[error("Could not scrap metadata with calibre")]
     Calibre(#[from] calibre::CalibreMetadataError),
+    #[error("Could not fetch metadata with open library")]
+    OpenLibrary(#[from] openlibrary::OpenLibraryMetadataError),
 }
 
-#[derive(serde::Deserialize, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum MetadataProvider {
     Calibre,
+    OpenLibrary,
 }
 
 pub async fn fetch_metadata(
@@ -44,6 +48,15 @@ pub async fn fetch_metadata(
                 .calibre
                 .as_ref()
                 .expect("missing calibre configuration"),
+            isbn,
+        )
+        .await?),
+        MetadataProvider::OpenLibrary => Ok(openlibrary::fetch_metadata(
+            config
+                .metadata
+                .open_library
+                .as_ref()
+                .expect("missing open_library configuration"),
             isbn,
         )
         .await?),

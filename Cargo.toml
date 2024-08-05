@@ -16,6 +16,9 @@ diesel-async = { version = "0.5.0", features = ["deadpool", "postgres"] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 image = "0.25.2"
 maud = { version = "0.26.0", features = ["axum"] }
+reqwest = { version = "0.12.5", default-features = false, features = [
+	"rustls-tls-native-roots",
+] }
 roxmltree = { version = "0.20.0", default-features = false, features = ["std"] }
 serde = { version = "1.0.204", features = ["derive"] }
 tempfile = "3.11.0"
