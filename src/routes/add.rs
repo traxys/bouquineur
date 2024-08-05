@@ -467,24 +467,42 @@ pub(crate) async fn add_book(
         Some(list) => !list.is_empty(),
     };
 
-    let (not_found, book_details) = match &isbn.isbn {
+    enum SearchResult {
+        Found,
+        NotFound,
+        AlreadyExists,
+    }
+
+    let (res, book_details) = match &isbn.isbn {
         Some(isbn) if has_provider => {
             let isbn = isbn.replace('-', "");
 
-            fetch_metadata(
-                &state.config,
-                &isbn,
-                state
-                    .config
-                    .metadata
-                    .default_provider
-                    .unwrap_or(MetadataProvider::Calibre),
-            )
-            .await?
-            .map(|v| (false, v))
-            .unwrap_or_else(|| (true, Default::default()))
+            let mut conn = state.db.get().await?;
+
+            let found: i64 = book::table
+                .filter(book::owner.eq(user.id).and(book::isbn.eq(&isbn)))
+                .count()
+                .get_result(&mut conn)
+                .await?;
+
+            if found == 0 {
+                fetch_metadata(
+                    &state.config,
+                    &isbn,
+                    state
+                        .config
+                        .metadata
+                        .default_provider
+                        .unwrap_or(MetadataProvider::Calibre),
+                )
+                .await?
+                .map(|v| (SearchResult::Found, v))
+                .unwrap_or_else(|| (SearchResult::NotFound, Default::default()))
+            } else {
+                (SearchResult::AlreadyExists, Default::default())
+            }
         }
-        _ => (false, (NullableBookDetails::default())),
+        _ => (SearchResult::NotFound, (NullableBookDetails::default())),
     };
 
     Ok(app_page(
@@ -531,10 +549,18 @@ pub(crate) async fn add_book(
                 }  }
             }
 
-            @if not_found {
-                .alert.alert-warning role="alert" {
-                    "The requested ISBN was not found"
-                }
+            @match res {
+                SearchResult::Found => {},
+                SearchResult::NotFound => {
+                    .alert.alert-warning role="alert" {
+                        "The requested ISBN was not found"
+                    }
+                },
+                SearchResult::AlreadyExists => {
+                    .alert.alert-warning role="alert" {
+                        "The requested ISBN is already in the database"
+                    }
+                },
             }
 
             .d-flex.flex-column {
