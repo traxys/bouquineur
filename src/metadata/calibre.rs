@@ -3,7 +3,7 @@ use std::io::Read;
 use base64::prelude::*;
 use bstr::{BString, ByteSlice};
 
-use crate::Config;
+use crate::CalibreConfig;
 
 use super::NullableBookDetails;
 
@@ -91,7 +91,7 @@ fn parse_opf(
 }
 
 pub(super) async fn fetch_metadata(
-    config: &Config,
+    config: &CalibreConfig,
     isbn: &str,
 ) -> Result<Option<NullableBookDetails>, CalibreMetadataError> {
     tracing::debug!("Fetching metadata for isbn '{isbn}'");
@@ -101,7 +101,7 @@ pub(super) async fn fetch_metadata(
         .tempfile()
         .map_err(CalibreMetadataError::CoverArt)?;
 
-    let output = tokio::process::Command::new(&config.metadata.fetcher)
+    let output = tokio::process::Command::new(&config.fetcher)
         .arg("--isbn")
         .arg(isbn)
         .arg("--opf")

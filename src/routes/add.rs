@@ -462,12 +462,19 @@ pub(crate) async fn add_book(
     user: User,
     isbn: Query<IsbnRequest>,
 ) -> Result<maud::Markup, RouteError> {
+    let has_provider = match &state.config.metadata.providers {
+        None => true,
+        Some(list) => !list.is_empty(),
+    };
+
     let (not_found, book_details) = match &isbn.isbn {
-        None => (false, (NullableBookDetails::default())),
-        Some(isbn) => fetch_metadata(&state.config, isbn, MetadataProvider::Calibre)
-            .await?
-            .map(|v| (false, v))
-            .unwrap_or_else(|| (true, Default::default())),
+        Some(isbn) if has_provider => {
+            fetch_metadata(&state.config, isbn, MetadataProvider::Calibre)
+                .await?
+                .map(|v| (false, v))
+                .unwrap_or_else(|| (true, Default::default()))
+        }
+        _ => (false, (NullableBookDetails::default())),
     };
 
     Ok(app_page(
@@ -521,12 +528,14 @@ pub(crate) async fn add_book(
             }
 
             .d-flex.flex-column {
-                .d-flex.justify-content-center {
-                    button .btn.btn-primary.me-2 data-bs-toggle="modal" data-bs-target="#isbnModal" {
-                        (icons::bi_123()) "Load from ISBN"
-                    }
-                    button .btn.btn-primary data-bs-toggle="modal" data-bs-target="#scanModal" {
-                        (icons::bi_upc_scan()) "Scan ISBN"
+                @if has_provider {
+                    .d-flex.justify-content-center {
+                        button .btn.btn-primary.me-2 data-bs-toggle="modal" data-bs-target="#isbnModal" {
+                            (icons::bi_123()) "Load from ISBN"
+                        }
+                        button .btn.btn-primary data-bs-toggle="modal" data-bs-target="#scanModal" {
+                            (icons::bi_upc_scan()) "Scan ISBN"
+                        }
                     }
                 }
                 (book_form(&state, &user, book_details).await?)

@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use axum::{http::HeaderName, routing::get, Router};
 use diesel::Connection;
 use diesel_async::{
@@ -8,6 +8,7 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use metadata::MetadataProvider;
 use serde::Deserializer;
 
 mod metadata;
@@ -61,9 +62,32 @@ struct DatabaseConfig {
 }
 
 #[derive(serde::Deserialize, Debug)]
-struct MetadataConfig {
+struct CalibreConfig {
     fetcher: String,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct MetadataConfig {
+    #[serde(default)]
+    providers: Option<Vec<MetadataProvider>>,
     image_dir: PathBuf,
+
+    #[serde(default)]
+    calibre: Option<CalibreConfig>,
+}
+
+impl MetadataConfig {
+    fn check_calibre(&self) -> anyhow::Result<()> {
+        let has = match &self.providers {
+            None => true,
+            Some(v) => v.contains(&MetadataProvider::Calibre),
+        };
+
+        match has && self.calibre.is_none() {
+            true => Err(anyhow!("Missing `[metadata.calibre]`")),
+            false => Ok(()),
+        }
+    }
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -121,6 +145,8 @@ async fn main() -> anyhow::Result<()> {
     } else {
         anyhow::bail!("No configuration was supplied");
     };
+
+    cfg.metadata.check_calibre()?;
 
     std::fs::create_dir_all(&cfg.metadata.image_dir)
         .with_context(|| "Could not create image directory")?;

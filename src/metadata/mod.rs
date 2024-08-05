@@ -27,6 +27,7 @@ pub enum MetadataError {
     Calibre(#[from] calibre::CalibreMetadataError),
 }
 
+#[derive(serde::Deserialize, Debug, PartialEq, Eq)]
 pub enum MetadataProvider {
     Calibre,
 }
@@ -37,6 +38,14 @@ pub async fn fetch_metadata(
     provider: MetadataProvider,
 ) -> Result<Option<NullableBookDetails>, MetadataError> {
     match provider {
-        MetadataProvider::Calibre => Ok(calibre::fetch_metadata(config, isbn).await?),
+        MetadataProvider::Calibre => Ok(calibre::fetch_metadata(
+            config
+                .metadata
+                .calibre
+                .as_ref()
+                .expect("missing calibre configuration"),
+            isbn,
+        )
+        .await?),
     }
 }
