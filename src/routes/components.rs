@@ -147,6 +147,7 @@ pub async fn book_form(
     state: &State,
     user: &User,
     details: NullableBookDetails,
+    submit: &str,
 ) -> Result<maud::Markup, RouteError> {
     let image = details
         .covert_art_b64
@@ -238,7 +239,7 @@ pub async fn book_form(
                         placeholder="Page Count" value=[details.page_count];
                 label for="pageCount" { "Page Count" }
             }
-            input type="submit" .btn.btn-primary value="Add Book";
+            input type="submit" .btn.btn-primary value=(submit);
         } },
     )
 }

@@ -33,6 +33,7 @@ use crate::{
 };
 
 mod add;
+mod edit;
 mod get_author;
 mod get_book;
 mod icons;
@@ -40,6 +41,7 @@ mod icons;
 mod components;
 
 pub(crate) use add::{add_book, do_add_book};
+pub(crate) use edit::edit_book;
 pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 

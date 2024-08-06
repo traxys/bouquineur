@@ -61,7 +61,10 @@ pub(crate) async fn get_book(
         &user,
         html! {
             .container.text-center {
-                h2 { (book.title) }
+                h2 {
+                    (book.title)
+                    a .ms-2.btn.btn-primary href=(format!("{}/edit", *id)) { i .bi.bi-pencil {} }
+                }
                 ."mb-2" {
                     img style="height: 24rem" src=(image_url) alt="cover art";
                 }
@@ -70,11 +73,11 @@ pub(crate) async fn get_book(
                         @if i != 0 {
                             ", "
                         }
-                        span .fs-4 { 
-                            a .link-light.link-offset-1 
-                                href=(format!("/author/{}", author.id)) { 
-                                (author.name)   
-                            } 
+                        span .fs-4 {
+                            a .link-light.link-offset-1
+                                href=(format!("/author/{}", author.id)) {
+                                (author.name)
+                            }
                         }
                     }
                     br;

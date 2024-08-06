@@ -256,7 +256,7 @@ pub(crate) async fn add_book(
                         }
                     }
                 }
-                (book_form(&state, &user, book_details).await?)
+                (book_form(&state, &user, book_details, "Add Book").await?)
             }
 
             script {
