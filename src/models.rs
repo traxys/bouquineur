@@ -120,9 +120,10 @@ pub struct BookComplete {
     pub pagecount: Option<i32>,
 }
 
-#[derive(Insertable, Selectable, Queryable)]
+#[derive(Insertable, Selectable, Queryable, Debug, AsChangeset)]
 #[diesel(table_name = crate::schema::book)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(treat_none_as_null = true)]
 pub struct Book {
     pub owner: Uuid,
     pub isbn: String,
@@ -135,4 +136,11 @@ pub struct Book {
     pub amazonid: Option<String>,
     pub librarythingid: Option<String>,
     pub pagecount: Option<i32>,
+}
+
+#[derive(Queryable, Identifiable, Selectable, Debug)]
+#[diesel(table_name = crate::schema::book)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct BookId {
+    pub id: Uuid,
 }

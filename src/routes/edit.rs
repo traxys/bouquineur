@@ -1,19 +1,134 @@
-use axum::extract::Path;
+use std::{fs::OpenOptions, io::BufWriter};
+
+use axum::{extract::Path, response::Redirect};
 use base64::prelude::*;
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use maud::html;
 use uuid::Uuid;
 
 use crate::{
     metadata::NullableBookDetails,
-    models::{BookAuthor, BookComplete, BookTag, User},
+    models::{BookAuthor, BookComplete, BookId, BookTag, User},
     routes::components::book_form,
-    schema::{author, book, tag},
+    schema::{author, book, bookauthor, booktag, tag},
     State,
 };
 
-use super::{app_page, RouteError};
+use super::{app_page, BookInfo, RouteError};
+
+pub(crate) async fn do_edit_book(
+    state: State,
+    user: User,
+    id: Path<Uuid>,
+    data: BookInfo,
+) -> Result<Redirect, RouteError> {
+    let mut conn = state.db.get().await?;
+
+    let has_book: i64 = book::table
+        .filter(book::owner.eq(user.id))
+        .find(*id)
+        .count()
+        .get_result(&mut conn)
+        .await?;
+
+    if has_book == 0 {
+        return Err(RouteError::NotFound);
+    }
+
+    conn.transaction(|c| {
+        async {
+            diesel::delete(bookauthor::table)
+                .filter(bookauthor::book.eq(*id))
+                .execute(c)
+                .await?;
+
+            diesel::delete(booktag::table)
+                .filter(booktag::book.eq(*id))
+                .execute(c)
+                .await?;
+
+            diesel::insert_into(author::table)
+                .values(&data.authors)
+                .on_conflict_do_nothing()
+                .execute(c)
+                .await?;
+
+            diesel::insert_into(tag::table)
+                .values(&data.tags)
+                .on_conflict_do_nothing()
+                .execute(c)
+                .await?;
+
+            diesel::update(&BookId { id: *id })
+                .set(data.book)
+                .execute(c)
+                .await?;
+
+            let author_ids: Vec<i32> = author::table
+                .filter(author::name.eq_any(&data.authors))
+                .select(author::id)
+                .load(c)
+                .await?;
+
+            diesel::insert_into(bookauthor::table)
+                .values(
+                    &author_ids
+                        .into_iter()
+                        .map(|author| BookAuthor { book: *id, author })
+                        .collect::<Vec<_>>(),
+                )
+                .execute(c)
+                .await?;
+
+            let tag_ids: Vec<i32> = tag::table
+                .filter(tag::name.eq_any(&data.tags))
+                .select(tag::id)
+                .load(c)
+                .await?;
+
+            diesel::insert_into(booktag::table)
+                .values(
+                    &tag_ids
+                        .into_iter()
+                        .map(|tag| BookTag { book: *id, tag })
+                        .collect::<Vec<_>>(),
+                )
+                .execute(c)
+                .await?;
+
+            let image_dir = state.config.metadata.image_dir.join(user.id.to_string());
+
+            std::fs::create_dir_all(&image_dir)
+                .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
+
+            let mut image_path = image_dir.join(id.to_string());
+            image_path.set_extension("jpg");
+
+            if let Some(img) = data.image {
+                tokio::task::block_in_place(|| -> Result<_, RouteError> {
+                    let file = OpenOptions::new()
+                        .truncate(true)
+                        .write(true)
+                        .read(true)
+                        .open(&image_path)
+                        .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
+
+                    img.write_to(&mut BufWriter::new(file), image::ImageFormat::Jpeg)
+                        .map_err(RouteError::ImageSave)?;
+
+                    Ok(())
+                })?;
+            }
+
+            Ok::<_, RouteError>(())
+        }
+        .scope_boxed()
+    })
+    .await?;
+
+    Ok(Redirect::to(&format!("/book/{}", *id)))
+}
 
 pub(crate) async fn edit_book(
     state: State,

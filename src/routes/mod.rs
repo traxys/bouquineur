@@ -41,7 +41,7 @@ mod icons;
 mod components;
 
 pub(crate) use add::{add_book, do_add_book};
-pub(crate) use edit::edit_book;
+pub(crate) use edit::{do_edit_book, edit_book};
 pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 
@@ -276,7 +276,8 @@ impl FromRequestParts<Arc<AppState>> for User {
     }
 }
 
-struct BookInfo {
+#[derive(Debug)]
+pub(crate) struct BookInfo {
     book: Book,
     image: Option<image::DynamicImage>,
     authors: Vec<AuthorName>,
