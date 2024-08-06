@@ -1,4 +1,7 @@
-use std::{num::ParseIntError, sync::Arc};
+use std::{
+    num::ParseIntError,
+    sync::{Arc, LazyLock},
+};
 
 use axum::{
     async_trait,
@@ -7,6 +10,8 @@ use axum::{
     http::{header::CONTENT_TYPE, StatusCode},
     response::IntoResponse,
 };
+use base64::prelude::*;
+use components::{book_cards_for, NO_SORT};
 use diesel::prelude::*;
 use diesel_async::pooled_connection::deadpool::PoolError;
 use diesel_async::RunQueryDsl;
@@ -16,8 +21,8 @@ use uuid::Uuid;
 
 use crate::{
     metadata::MetadataError,
-    models::{Author, BookAuthor, BookPreview, NewUser, User},
-    schema::{author, book, users},
+    models::{BookPreview, NewUser, User},
+    schema::{book, users},
     AppState, State,
 };
 
@@ -25,6 +30,8 @@ mod add;
 mod get_author;
 mod get_book;
 mod icons;
+
+mod components;
 
 pub(crate) use add::{add_book, do_add_book};
 pub(crate) use get_author::get_author;
@@ -123,6 +130,11 @@ impl Page {
         }
     }
 }
+
+static NO_COVER: LazyLock<String> = LazyLock::new(|| {
+    let image = include_bytes!("../no_cover.jpg");
+    BASE64_STANDARD.encode(image)
+});
 
 fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
     html! {
@@ -277,88 +289,6 @@ pub(crate) async fn image_not_found(_user: User) -> impl IntoResponse {
     let image = include_bytes!("../no_cover.jpg");
 
     ([(CONTENT_TYPE, "image/jpeg")], image)
-}
-
-const NO_SORT: Option<fn(&BookPreview, &BookPreview) -> std::cmp::Ordering> = None;
-
-async fn book_cards_for<F>(
-    state: &State,
-    user: &User,
-    books: &[BookPreview],
-    sort_by: Option<F>,
-) -> Result<maud::Markup, RouteError>
-where
-    F: Fn(&BookPreview, &BookPreview) -> std::cmp::Ordering,
-{
-    let mut conn = state.db.get().await?;
-
-    let authors = BookAuthor::belonging_to(books)
-        .inner_join(author::table)
-        .select((BookAuthor::as_select(), Author::as_select()))
-        .load::<(BookAuthor, Author)>(&mut conn)
-        .await?;
-
-    let mut book_data: Vec<_> = authors
-        .grouped_by(books)
-        .into_iter()
-        .zip(books)
-        .map(|(a, book)| {
-            let image_path = state
-                .config
-                .metadata
-                .image_dir
-                .join(user.id.to_string())
-                .join(format!("{}.jpg", book.id));
-
-            let image_url = match image_path.exists() {
-                true => format!("/images/{}", book.id),
-                false => "/images/not_found".to_string(),
-            };
-
-            Ok((
-                book,
-                image_url,
-                a.into_iter().map(|(_, author)| author).collect::<Vec<_>>(),
-            ))
-        })
-        .collect::<Result<_, RouteError>>()?;
-
-    if let Some(f) = sort_by {
-        book_data.sort_unstable_by(|(book_a, _, _), (book_b, _, _)| f(book_a, book_b));
-    }
-
-    Ok(html! {
-        .container {
-            .row.row-cols-auto.justify-content-center.justify-content-md-start {
-                @for (book, image, authors) in book_data {
-                    ."col"."mb-2" {
-                        .card."h-100" style="width: 9.6rem;" {
-                            img src=(image) .card-img-top alt="book cover"
-                                style="height: 14.4rem; width: 9.6rem;";
-                            .card-body {
-                                h6 .card-title {
-                                    a .nav-link.fs-5 href=(format!("/book/{}", book.id)) {
-                                        (book.title)
-                                    }
-                                }
-                                p .card-text {
-                                    @for (i, author) in authors.iter().enumerate() {
-                                        @if i != 0 {
-                                            ", "
-                                        }
-                                        a href=(format!("/author/{}", author.id))
-                                          .nav-link {
-                                            (author.name)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    })
 }
 
 pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, RouteError> {
