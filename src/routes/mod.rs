@@ -1,16 +1,22 @@
 use std::{
+    io::Cursor,
     num::ParseIntError,
     sync::{Arc, LazyLock},
 };
 
 use axum::{
     async_trait,
-    body::Body,
-    extract::{multipart::MultipartError, FromRequestParts, Path},
+    body::{Body, Bytes},
+    extract::{
+        multipart::{MultipartError, MultipartRejection},
+        FromRequest, FromRequestParts, Multipart, Path, Request,
+    },
     http::{header::CONTENT_TYPE, StatusCode},
     response::IntoResponse,
+    RequestExt,
 };
 use base64::prelude::*;
+use chrono::NaiveDate;
 use components::{book_cards_for, NO_SORT};
 use diesel::prelude::*;
 use diesel_async::pooled_connection::deadpool::PoolError;
@@ -21,7 +27,7 @@ use uuid::Uuid;
 
 use crate::{
     metadata::MetadataError,
-    models::{BookPreview, NewUser, User},
+    models::{AuthorName, Book, BookPreview, NewUser, TagName, User},
     schema::{book, users},
     AppState, State,
 };
@@ -69,11 +75,16 @@ pub(crate) enum RouteError {
     NotFound,
     #[error("Unexpected IO error")]
     IO(#[from] std::io::Error),
+    #[error("Invalid multipart")]
+    Multipart(#[from] MultipartRejection),
 }
 
 impl IntoResponse for RouteError {
     fn into_response(self) -> axum::response::Response {
-        tracing::error!("route error: {self} ({self:#?})");
+        if !matches!(&self, Self::MultipartError(_)) {
+            tracing::error!("route error: {self} ({self:#?})");
+        }
+
         let (code, text) = match self {
             // Don't reveal the missing authenitication header to the client, this is a
             // mis-configuration that could be exploited
@@ -92,6 +103,7 @@ impl IntoResponse for RouteError {
             RouteError::ImageDetection(e) => (StatusCode::BAD_REQUEST, e.to_string()),
             RouteError::Image(e) => (StatusCode::BAD_REQUEST, e.to_string()),
             RouteError::NotFound => (StatusCode::NOT_FOUND, "Resource not found".into()),
+            RouteError::Multipart(r) => return r.into_response(),
         };
 
         (
@@ -259,6 +271,142 @@ impl FromRequestParts<Arc<AppState>> for User {
             .select(User::as_select())
             .first(&mut conn)
             .await?)
+    }
+}
+
+struct BookInfo {
+    book: Book,
+    image: Option<image::DynamicImage>,
+    authors: Vec<AuthorName>,
+    tags: Vec<TagName>,
+}
+
+#[async_trait]
+impl FromRequest<Arc<AppState>> for BookInfo {
+    type Rejection = RouteError;
+
+    async fn from_request(
+        mut req: Request,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Self::Rejection> {
+        let user: User = req.extract_parts_with_state(state).await?;
+        let mut multipart = Multipart::from_request(req, state).await?;
+
+        enum CoverArt {
+            User(Bytes),
+            Fetched(String),
+        }
+
+        #[derive(Default)]
+        struct BookData {
+            cover_art: Option<CoverArt>,
+            title: Option<String>,
+            isbn: Option<String>,
+            summary: String,
+            authors: Vec<AuthorName>,
+            tags: Vec<TagName>,
+            publication_date: Option<NaiveDate>,
+            publisher: Option<String>,
+            language: Option<String>,
+            google_id: Option<String>,
+            amazon_id: Option<String>,
+            librarything_id: Option<String>,
+            page_count: Option<i32>,
+        }
+
+        let mut data = BookData::default();
+        let load = |s: String| if s.is_empty() { None } else { Some(s) };
+
+        while let Some(field) = multipart.next_field().await? {
+            let Some(name) = field.name() else {
+                tracing::warn!("Unamed multipart field");
+                continue;
+            };
+
+            match name {
+                "user_cover" => {
+                    let cover = field.bytes().await?;
+                    if !cover.is_empty() {
+                        data.cover_art = Some(CoverArt::User(cover));
+                    }
+                }
+                "fetched_cover" => {
+                    if data.cover_art.is_none() {
+                        data.cover_art = Some(CoverArt::Fetched(field.text().await?));
+                    }
+                }
+                "title" => data.title = load(field.text().await?),
+                "isbn" => data.isbn = load(field.text().await?),
+                "summary" => data.summary = field.text().await?,
+                "author" => data.authors.push(AuthorName {
+                    name: field.text().await?,
+                }),
+                "tag" => data.tags.push(TagName {
+                    name: field.text().await?,
+                }),
+                "published" => {
+                    let text = field.text().await?;
+                    if !text.is_empty() {
+                        data.publication_date = Some(NaiveDate::parse_from_str(&text, "%Y-%m-%d")?)
+                    }
+                }
+                "publisher" => data.publisher = load(field.text().await?),
+                "language" => data.language = load(field.text().await?),
+                "google_id" => data.google_id = load(field.text().await?),
+                "amazon_id" => data.amazon_id = load(field.text().await?),
+                "librarything_id" => data.librarything_id = load(field.text().await?),
+                "page_count" => {
+                    let text = field.text().await?;
+                    if !text.is_empty() {
+                        data.page_count = Some(text.parse()?)
+                    }
+                }
+                _ => {
+                    tracing::warn!("Unknown field {:?}", field.name());
+                }
+            }
+        }
+
+        let book = Book {
+            owner: user.id,
+            isbn: data.isbn.ok_or(RouteError::MissingField)?,
+            title: data.title.ok_or(RouteError::MissingField)?,
+            summary: data.summary,
+            published: data.publication_date,
+            publisher: data.publisher,
+            language: data.language,
+            googleid: data.google_id,
+            amazonid: data.amazon_id,
+            librarythingid: data.librarything_id,
+            pagecount: data.page_count,
+        };
+
+        let image = match data.cover_art {
+            Some(CoverArt::User(bytes)) => Some(
+                image::ImageReader::new(Cursor::new(bytes))
+                    .with_guessed_format()
+                    .map_err(RouteError::ImageDetection)?
+                    .decode()?,
+            ),
+            Some(CoverArt::Fetched(data)) => {
+                let data = BASE64_STANDARD.decode(data)?;
+
+                Some(
+                    image::ImageReader::new(Cursor::new(data))
+                        .with_guessed_format()
+                        .map_err(RouteError::ImageDetection)?
+                        .decode()?,
+                )
+            }
+            None => None,
+        };
+
+        Ok(BookInfo {
+            book,
+            image,
+            authors: data.authors,
+            tags: data.tags,
+        })
     }
 }
 

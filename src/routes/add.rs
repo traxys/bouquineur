@@ -1,11 +1,6 @@
-use std::{cmp::Ordering, io::Cursor};
+use std::cmp::Ordering;
 
-use axum::{
-    body::Bytes,
-    extract::{Multipart, Query},
-};
-use base64::prelude::*;
-use chrono::NaiveDate;
+use axum::extract::Query;
 use diesel::prelude::*;
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use maud::html;
@@ -13,129 +8,19 @@ use uuid::Uuid;
 
 use crate::{
     metadata::{fetch_metadata, MetadataProvider, NullableBookDetails},
-    models::{AuthorName, Book, BookAuthor, BookTag, TagName, User},
+    models::{BookAuthor, BookTag, User},
     routes::components::book_form,
     schema::{author, book, bookauthor, booktag, tag},
 };
 
-use super::{app_page, icons, Page, RouteError, State};
+use super::{app_page, icons, BookInfo, Page, RouteError, State};
 
 pub(crate) async fn do_add_book(
     state: State,
     user: User,
-    mut multipart: Multipart,
+    data: BookInfo,
 ) -> Result<axum::response::Redirect, RouteError> {
-    enum CoverArt {
-        User(Bytes),
-        Fetched(String),
-    }
-
-    #[derive(Default)]
-    struct BookData {
-        cover_art: Option<CoverArt>,
-        title: Option<String>,
-        isbn: Option<String>,
-        summary: String,
-        authors: Vec<AuthorName>,
-        tags: Vec<TagName>,
-        publication_date: Option<NaiveDate>,
-        publisher: Option<String>,
-        language: Option<String>,
-        google_id: Option<String>,
-        amazon_id: Option<String>,
-        librarything_id: Option<String>,
-        page_count: Option<i32>,
-    }
-
-    let mut data = BookData::default();
-
-    let load = |s: String| if s.is_empty() { None } else { Some(s) };
-
-    while let Some(field) = multipart.next_field().await? {
-        let Some(name) = field.name() else {
-            tracing::warn!("Unamed multipart field");
-            continue;
-        };
-
-        match name {
-            "user_cover" => {
-                let cover = field.bytes().await?;
-                if !cover.is_empty() {
-                    data.cover_art = Some(CoverArt::User(cover));
-                }
-            }
-            "fetched_cover" => {
-                if data.cover_art.is_none() {
-                    data.cover_art = Some(CoverArt::Fetched(field.text().await?));
-                }
-            }
-            "title" => data.title = load(field.text().await?),
-            "isbn" => data.isbn = load(field.text().await?),
-            "summary" => data.summary = field.text().await?,
-            "author" => data.authors.push(AuthorName {
-                name: field.text().await?,
-            }),
-            "tag" => data.tags.push(TagName {
-                name: field.text().await?,
-            }),
-            "published" => {
-                let text = field.text().await?;
-                if !text.is_empty() {
-                    data.publication_date = Some(NaiveDate::parse_from_str(&text, "%Y-%m-%d")?)
-                }
-            }
-            "publisher" => data.publisher = load(field.text().await?),
-            "language" => data.language = load(field.text().await?),
-            "google_id" => data.google_id = load(field.text().await?),
-            "amazon_id" => data.amazon_id = load(field.text().await?),
-            "librarything_id" => data.librarything_id = load(field.text().await?),
-            "page_count" => {
-                let text = field.text().await?;
-                if !text.is_empty() {
-                    data.page_count = Some(text.parse()?)
-                }
-            }
-            _ => {
-                tracing::warn!("Unknown field {:?}", field.name());
-            }
-        }
-    }
-
-    let book = Book {
-        owner: user.id,
-        isbn: data.isbn.ok_or(RouteError::MissingField)?,
-        title: data.title.ok_or(RouteError::MissingField)?,
-        summary: data.summary,
-        published: data.publication_date,
-        publisher: data.publisher,
-        language: data.language,
-        googleid: data.google_id,
-        amazonid: data.amazon_id,
-        librarythingid: data.librarything_id,
-        pagecount: data.page_count,
-    };
-
     let mut conn = state.db.get().await?;
-
-    let image = match data.cover_art {
-        Some(CoverArt::User(bytes)) => Some(
-            image::ImageReader::new(Cursor::new(bytes))
-                .with_guessed_format()
-                .map_err(RouteError::ImageDetection)?
-                .decode()?,
-        ),
-        Some(CoverArt::Fetched(data)) => {
-            let data = BASE64_STANDARD.decode(data)?;
-
-            Some(
-                image::ImageReader::new(Cursor::new(data))
-                    .with_guessed_format()
-                    .map_err(RouteError::ImageDetection)?
-                    .decode()?,
-            )
-        }
-        None => None,
-    };
 
     conn.transaction(|c| {
         async {
@@ -152,7 +37,7 @@ pub(crate) async fn do_add_book(
                 .await?;
 
             let book_id: Uuid = diesel::insert_into(book::table)
-                .values(book)
+                .values(data.book)
                 .returning(book::id)
                 .get_result(c)
                 .await?;
@@ -200,7 +85,7 @@ pub(crate) async fn do_add_book(
             let mut image_path = image_dir.join(book_id.to_string());
             image_path.set_extension("jpg");
 
-            if let Some(img) = image {
+            if let Some(img) = data.image {
                 tokio::task::block_in_place(|| -> Result<_, RouteError> {
                     img.save(image_path).map_err(RouteError::ImageSave)?;
                     Ok(())
