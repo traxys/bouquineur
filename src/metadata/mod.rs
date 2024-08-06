@@ -30,10 +30,32 @@ pub enum MetadataError {
     OpenLibrary(#[from] openlibrary::OpenLibraryMetadataError),
 }
 
-#[derive(serde::Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum MetadataProvider {
     Calibre,
     OpenLibrary,
+}
+
+impl MetadataProvider {
+    pub fn all() -> &'static [Self] {
+        &[Self::Calibre, Self::OpenLibrary]
+    }
+
+    pub fn serialized(&self) -> &'static str {
+        match self {
+            MetadataProvider::Calibre => "Calibre",
+            MetadataProvider::OpenLibrary => "OpenLibrary",
+        }
+    }
+}
+
+impl std::fmt::Display for MetadataProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetadataProvider::Calibre => write!(f, "Calibre"),
+            MetadataProvider::OpenLibrary => write!(f, "Open Library"),
+        }
+    }
 }
 
 pub async fn fetch_metadata(

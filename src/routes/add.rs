@@ -1,4 +1,4 @@
-use std::{io::Cursor, sync::LazyLock};
+use std::{cmp::Ordering, io::Cursor, sync::LazyLock};
 
 use axum::{
     body::Bytes,
@@ -455,16 +455,33 @@ pub(crate) async fn do_add_book(
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct IsbnRequest {
     isbn: Option<String>,
+    provider: Option<MetadataProvider>,
 }
 
 pub(crate) async fn add_book(
     state: State,
     user: User,
-    isbn: Query<IsbnRequest>,
+    query: Query<IsbnRequest>,
 ) -> Result<maud::Markup, RouteError> {
     let has_provider = match &state.config.metadata.providers {
         None => true,
         Some(list) => !list.is_empty(),
+    };
+
+    let providers = state
+        .config
+        .metadata
+        .providers
+        .as_deref()
+        .unwrap_or(MetadataProvider::all());
+
+    let default_provider = match providers.len().cmp(&1) {
+        Ordering::Equal => providers[0],
+        _ => state
+            .config
+            .metadata
+            .default_provider
+            .unwrap_or(MetadataProvider::Calibre),
     };
 
     enum SearchResult {
@@ -473,7 +490,7 @@ pub(crate) async fn add_book(
         AlreadyExists,
     }
 
-    let (res, book_details) = match &isbn.isbn {
+    let (res, book_details) = match &query.isbn {
         Some(isbn) if has_provider => {
             let isbn = isbn.replace('-', "");
 
@@ -489,11 +506,7 @@ pub(crate) async fn add_book(
                 fetch_metadata(
                     &state.config,
                     &isbn,
-                    state
-                        .config
-                        .metadata
-                        .default_provider
-                        .unwrap_or(MetadataProvider::Calibre),
+                    query.provider.unwrap_or(default_provider),
                 )
                 .await?
                 .map(|v| (SearchResult::Found, v))
@@ -502,7 +515,7 @@ pub(crate) async fn add_book(
                 (SearchResult::AlreadyExists, Default::default())
             }
         }
-        _ => (SearchResult::NotFound, (NullableBookDetails::default())),
+        _ => (SearchResult::Found, (NullableBookDetails::default())),
     };
 
     Ok(app_page(
@@ -565,6 +578,26 @@ pub(crate) async fn add_book(
 
             .d-flex.flex-column {
                 @if has_provider {
+                    @if providers.len() > 1 {
+                        .container {
+                            ul .list-group."mb-2" {
+                                li .list-group-item {
+                                    "Metadata provider"
+                                }
+                                @for &provider in providers {
+                                    li .list-group-item {
+                                        @let id = format!("{provider}Radio");
+                                        input .form-check-input."me-1" type="radio" #(id)
+                                              name="provider" value=(provider.serialized())
+                                              form="isbnModalForm" checked[provider == default_provider];
+                                        label .form-check-label for=(id) {
+                                            (provider.to_string())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     .d-flex.justify-content-center {
                         button .btn.btn-primary.me-2 data-bs-toggle="modal" data-bs-target="#isbnModal" {
                             (icons::bi_123()) "Load from ISBN"

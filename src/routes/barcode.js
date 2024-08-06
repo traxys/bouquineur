@@ -3,6 +3,8 @@ window.addEventListener('load', function () {
 
 	const scanVideo = document.getElementById("scanVideo");
 
+	const isbnModalForm = document.getElementById("isbnModalForm");
+
 	try {
 		window['BarcodeDetector'].getSupportedFormats()
 	} catch {
@@ -30,6 +32,7 @@ window.addEventListener('load', function () {
 			
 			var searchParams = new URLSearchParams(window.location.search);
 			searchParams.set("isbn", barcodes[0].rawValue);
+			searchParams.set("provider", isbnModalForm.provider.value)
 			window.location.search = searchParams.toString();
 
 			bootstrap.Modal.getInstance("#scanModal").hide()
