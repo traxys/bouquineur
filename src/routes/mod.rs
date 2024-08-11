@@ -279,6 +279,7 @@ impl FromRequestParts<Arc<AppState>> for User {
 #[derive(Debug)]
 pub(crate) struct BookInfo {
     book: Book,
+    series: Option<(String, i32)>,
     image: Option<image::DynamicImage>,
     authors: Vec<AuthorName>,
     tags: Vec<TagName>,
@@ -315,6 +316,8 @@ impl FromRequest<Arc<AppState>> for BookInfo {
             amazon_id: Option<String>,
             librarything_id: Option<String>,
             page_count: Option<i32>,
+            series_name: Option<String>,
+            series_volume: Option<i32>,
         }
 
         let mut data = BookData::default();
@@ -364,6 +367,13 @@ impl FromRequest<Arc<AppState>> for BookInfo {
                         data.page_count = Some(text.parse()?)
                     }
                 }
+                "series_name" => data.series_name = load(field.text().await?),
+                "series_volume" => {
+                    let text = field.text().await?;
+                    if !text.is_empty() {
+                        data.series_volume = Some(text.parse()?);
+                    }
+                }
                 _ => {
                     tracing::warn!("Unknown field {:?}", field.name());
                 }
@@ -404,9 +414,16 @@ impl FromRequest<Arc<AppState>> for BookInfo {
             None => None,
         };
 
+        let series = match (data.series_name, data.series_volume) {
+            (None, None) => None,
+            (Some(name), Some(volume)) => Some((name, volume)),
+            _ => return Err(RouteError::MissingField),
+        };
+
         Ok(BookInfo {
             book,
             image,
+            series,
             authors: data.authors,
             tags: data.tags,
         })

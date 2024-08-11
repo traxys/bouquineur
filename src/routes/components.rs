@@ -1,11 +1,11 @@
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use maud::html;
+use maud::{html, PreEscaped};
 
 use crate::{
     metadata::NullableBookDetails,
     models::{Author, BookAuthor, BookPreview, User},
-    schema::{author, book, bookauthor, booktag, tag},
+    schema::{author, book, bookauthor, booktag, series, tag},
     State,
 };
 
@@ -49,6 +49,16 @@ async fn tag_list(state: &State, user: &User) -> Result<Vec<String>, RouteError>
         .await?;
 
     Ok(authors)
+}
+
+async fn series_list(state: &State, user: &User) -> Result<Vec<String>, RouteError> {
+    let mut conn = state.db.get().await?;
+
+    Ok(series::table
+        .filter(series::owner.eq(user.id))
+        .select(series::name)
+        .load(&mut conn)
+        .await?)
 }
 
 fn list_input(
@@ -156,6 +166,7 @@ pub async fn book_form(
 
     let authors = author_list(state, user).await?;
     let tags = tag_list(state, user).await?;
+    let series = series_list(state, user).await?;
 
     Ok(
         html! { form .container-sm.align-items-center method="POST" enctype="multipart/form-data" .mt-2 {
@@ -201,6 +212,39 @@ pub async fn book_form(
                     (details.summary.unwrap_or_default())
                 }
                 label for="summary" { "Summary" }
+            }
+            .row."g-2"."mb-2" {
+                .col {
+                    input #seriesInput .form-control.awesomplete."me-1" list="seriesList" name="series_name"
+                        placeholder="Series";
+                    datalist #seriesList {
+                        @for series in series {
+                            option { (series) }
+                        }
+                    }
+                }
+                .col {
+                    input #seriesVolume name="series_volume" .form-control placeholder="Series volume" type="number";
+                }
+                script {
+                    (PreEscaped(r#"
+                        const seriesName = document.getElementById('seriesInput')
+                        const seriesVolume = document.getElementById('seriesVolume')
+                        const requiredOnLoad = seriesName.value != "" || seriesVolume.value != ""
+
+                        seriesName.required = requiredOnLoad
+                        seriesVolume.required = requiredOnLoad
+
+                        function setSeriesRequired() {
+                            const required = seriesName.value != "" || seriesVolume.value != ""
+                            seriesName.required = required
+                            seriesVolume.required = required
+                        }
+
+                        seriesName.addEventListener('input', setSeriesRequired)
+                        seriesVolume.addEventListener('input', setSeriesRequired)
+                    "#))
+                }
             }
             (list_input("author", "Author name", &details.authors, &authors, "Remove author"))
             (list_input("tag", "Tag", &details.tags, &tags, "Remove tag"))

@@ -7,10 +7,10 @@ It relies on calibre to fetch the book metadata from an ISBN, but it does not st
 
 - Ownership status
 - Reading status
-- Book series
 - Search (per author, per series)
 - Books to read
 - Sharing of library with other users
+- Graceful handling of duplicate entries in series
 
 ## Name
 

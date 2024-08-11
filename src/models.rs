@@ -144,3 +144,20 @@ pub struct Book {
 pub struct BookId {
     pub id: Uuid,
 }
+
+#[derive(Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::series)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Series {
+    pub owner: Uuid,
+    pub name: String,
+}
+
+#[derive(Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::bookseries)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct BookSeries {
+    pub book: Uuid,
+    pub series: Uuid,
+    pub number: i32,
+}

@@ -8,9 +8,9 @@ use uuid::Uuid;
 
 use crate::{
     metadata::{fetch_metadata, MetadataProvider, NullableBookDetails},
-    models::{BookAuthor, BookTag, User},
+    models::{BookAuthor, BookSeries, BookTag, Series, User},
     routes::components::book_form,
-    schema::{author, book, bookauthor, booktag, tag},
+    schema::{author, book, bookauthor, bookseries, booktag, series, tag},
 };
 
 use super::{app_page, icons, BookInfo, Page, RouteError, State};
@@ -41,6 +41,33 @@ pub(crate) async fn do_add_book(
                 .returning(book::id)
                 .get_result(c)
                 .await?;
+
+            if let Some((name, volume)) = data.series {
+                let series = Series {
+                    name,
+                    owner: user.id,
+                };
+
+                let series_id = diesel::insert_into(series::table)
+                    .values(&series)
+                    .on_conflict((series::owner, series::name))
+                    .do_update()
+                    .set(&series)
+                    .returning(series::id)
+                    .get_result(c)
+                    .await?;
+
+                let book_series = BookSeries {
+                    book: book_id,
+                    series: series_id,
+                    number: volume,
+                };
+
+                diesel::insert_into(bookseries::table)
+                    .values(&book_series)
+                    .execute(c)
+                    .await?;
+            }
 
             let author_ids: Vec<i32> = author::table
                 .filter(author::name.eq_any(&data.authors))

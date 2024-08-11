@@ -34,9 +34,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    bookseries (book) {
+        book -> Uuid,
+        series -> Uuid,
+        number -> Int4,
+    }
+}
+
+diesel::table! {
     booktag (book, tag) {
         book -> Uuid,
         tag -> Int4,
+    }
+}
+
+diesel::table! {
+    series (id) {
+        id -> Uuid,
+        owner -> Uuid,
+        name -> Text,
     }
 }
 
@@ -57,14 +73,19 @@ diesel::table! {
 diesel::joinable!(book -> users (owner));
 diesel::joinable!(bookauthor -> author (author));
 diesel::joinable!(bookauthor -> book (book));
+diesel::joinable!(bookseries -> book (book));
+diesel::joinable!(bookseries -> series (series));
 diesel::joinable!(booktag -> book (book));
 diesel::joinable!(booktag -> tag (tag));
+diesel::joinable!(series -> users (owner));
 
 diesel::allow_tables_to_appear_in_same_query!(
     author,
     book,
     bookauthor,
+    bookseries,
     booktag,
+    series,
     tag,
     users,
 );
