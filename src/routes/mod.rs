@@ -200,6 +200,12 @@ fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
                 script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.min.js"
                        integrity="sha512-Pc3/aEr2FIVZhHxe0RAC9SFrd+pxBJHN3pNJfJNTKc2XAFnXUjgQGIh6X935ePSXNMN6rFa3yftxSnZfJE8ZAg=="
                        crossorigin="anonymous" async {}
+                script {
+                    (maud::PreEscaped(r#"
+                        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+                        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+                    "#))
+                }
             }
         }
     }

@@ -153,11 +153,21 @@ pub struct Series {
     pub name: String,
 }
 
-#[derive(Insertable, AsChangeset)]
+#[derive(Insertable, AsChangeset, Associations, Identifiable, Selectable, Queryable, Debug)]
 #[diesel(table_name = crate::schema::bookseries)]
+#[diesel(belongs_to(BookPreview, foreign_key = book))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(primary_key(book))]
 pub struct BookSeries {
     pub book: Uuid,
     pub series: Uuid,
     pub number: i32,
+}
+
+#[derive(Insertable, Identifiable, Selectable, Queryable, Debug)]
+#[diesel(table_name = crate::schema::series)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct SeriesInfo {
+    pub id: Uuid,
+    pub name: String,
 }

@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use maud::{html, PreEscaped};
+use uuid::Uuid;
 
 use crate::{
     metadata::NullableBookDetails,
-    models::{Author, BookAuthor, BookPreview, User},
+    models::{Author, BookAuthor, BookPreview, BookSeries, SeriesInfo, User},
     schema::{author, book, bookauthor, booktag, series, tag},
     State,
 };
@@ -307,6 +310,33 @@ where
         .load::<(BookAuthor, Author)>(&mut conn)
         .await?;
 
+    let series = BookSeries::belonging_to(books)
+        .inner_join(series::table)
+        .select((BookSeries::as_select(), SeriesInfo::as_select()))
+        .load::<(BookSeries, SeriesInfo)>(&mut conn)
+        .await?;
+
+    #[derive(Debug)]
+    struct BookSeriesInfo {
+        name: String,
+        volume: i32,
+        series: Uuid,
+    }
+
+    let book_series = series
+        .into_iter()
+        .map(|(bookseries, series)| {
+            (
+                bookseries.book,
+                BookSeriesInfo {
+                    name: series.name,
+                    volume: bookseries.number,
+                    series: bookseries.series,
+                },
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
     let mut book_data: Vec<_> = authors
         .grouped_by(books)
         .into_iter()
@@ -328,18 +358,19 @@ where
                 book,
                 image_url,
                 a.into_iter().map(|(_, author)| author).collect::<Vec<_>>(),
+                book_series.get(&book.id),
             ))
         })
         .collect::<Result<_, RouteError>>()?;
 
     if let Some(f) = sort_by {
-        book_data.sort_unstable_by(|(book_a, _, _), (book_b, _, _)| f(book_a, book_b));
+        book_data.sort_unstable_by(|(book_a, _, _, _), (book_b, _, _, _)| f(book_a, book_b));
     }
 
     Ok(html! {
         .container {
             .row.row-cols-auto.justify-content-center.justify-content-md-start {
-                @for (book, image, authors) in book_data {
+                @for (book, image, authors, series) in book_data {
                     ."col"."mb-2" {
                         .card."h-100" style="width: 9.6rem;" {
                             img src=(image) .card-img-top alt="book cover"
@@ -359,6 +390,17 @@ where
                                           .nav-link {
                                             (author.name)
                                         }
+                                    }
+                                }
+                            }
+                            @if let Some(series) = series {
+                                .card-footer {
+                                    a href=(format!("/series/{}", series.series))
+                                      .link-light
+                                      data-bs-toggle="tooltip"
+                                      data-bs-title=(format!("{} #{}", series.name, series.volume))
+                                    {
+                                        i .bi.bi-collection {}
                                     }
                                 }
                             }
