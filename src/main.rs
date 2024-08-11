@@ -218,6 +218,7 @@ async fn main() -> anyhow::Result<()> {
             "/book/:id/edit",
             get(routes::edit_book).post(routes::do_edit_book),
         )
+        .route("/series", get(routes::series))
         .route("/series/:id", get(routes::get_series))
         .route("/author/:id", get(routes::get_author))
         .with_state(state);

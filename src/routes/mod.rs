@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use crate::{
     metadata::MetadataError,
-    models::{AuthorName, Book, BookPreview, NewUser, TagName, User},
+    models::{AuthorName, Book, BookPreview, NewUser, SeriesInfo, TagName, User},
     schema::{book, users},
     AppState, State,
 };
@@ -124,17 +124,19 @@ impl IntoResponse for RouteError {
 #[derive(PartialEq, Eq)]
 enum Page {
     Books,
+    Series,
     AddBook,
 }
 
 impl Page {
     fn variants() -> &'static [Self] {
-        &[Self::Books, Self::AddBook]
+        &[Self::Books, Self::Series, Self::AddBook]
     }
 
     pub fn name(&self) -> &'static str {
         match self {
             Page::Books => "Books",
+            Page::Series => "Series",
             Page::AddBook => "Add a Book",
         }
     }
@@ -143,6 +145,7 @@ impl Page {
         match self {
             Page::Books => "/",
             Page::AddBook => "/add",
+            Page::Series => "/series",
         }
     }
 }
@@ -487,6 +490,77 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
             .text-center {
                 h2 { "Books" }
                 (book_data)
+            }
+        },
+    ))
+}
+
+pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, RouteError> {
+    let mut conn = state.db.get().await?;
+
+    #[derive(QueryableByName, Debug)]
+    #[diesel(table_name = crate::schema::bookseries)]
+    #[diesel(check_for_backend(diesel::pg::Pg))]
+    struct BookSeriesBook {
+        book: Uuid,
+    }
+
+    let series = diesel::sql_query(
+        r#"
+        SELECT 
+            book, bs.series as id, series.name as name
+        FROM 
+            bookseries bs 
+        INNER JOIN 
+            (SELECT series, min(number) as minvolume FROM bookseries GROUP BY series) b 
+            ON b.series = bs.series AND bs.number = b.minvolume 
+        INNER JOIN 
+            series 
+            ON series.id = bs.series;
+    "#,
+    )
+    .get_results::<(BookSeriesBook, SeriesInfo)>(&mut conn)
+    .await?;
+
+    let make_image_url = |id: Uuid| {
+        let image_path = state
+            .config
+            .metadata
+            .image_dir
+            .join(user.id.to_string())
+            .join(format!("{id}.jpg"));
+
+        match image_path.exists() {
+            true => format!("/images/{id}"),
+            false => "/images/not_found".to_string(),
+        }
+    };
+
+    Ok(app_page(
+        Page::Series,
+        &user,
+        html! {
+            .text-center {
+                h2 { "Series" }
+                .container {
+                    .row.row-cols-auto.justify-content-center.justify-content-md-start {
+                        @for (first_volume, series) in series {
+                            .col."mb-2" {
+                                .card."h-100" style="width: 9.6rem;" {
+                                    img src=(make_image_url(first_volume.book)) .card-img-top
+                                        alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
+                                    .card-body {
+                                        h6 .card-title {
+                                            a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
+                                                (series.name)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
     ))

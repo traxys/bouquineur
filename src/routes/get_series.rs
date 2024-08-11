@@ -41,7 +41,7 @@ pub(crate) async fn get_series(
         .await?;
 
     Ok(app_page(
-        super::Page::Books,
+        super::Page::Series,
         &user,
         html! {
             .text-center {
