@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     models::{Author, BookAuthor, BookComplete, BookTag, User},
-    schema::{author, book, tag},
+    schema::{author, book, bookseries, series, tag},
     State,
 };
 
@@ -29,6 +29,14 @@ pub(crate) async fn get_book(
             diesel::result::Error::NotFound => RouteError::NotFound,
             _ => RouteError::from(e),
         })?;
+
+    let series: Option<(String, i32, Uuid)> = bookseries::table
+        .find(*id)
+        .inner_join(series::table)
+        .select((series::name, bookseries::number, series::id))
+        .first(&mut conn)
+        .await
+        .optional()?;
 
     let image_path = state
         .config
@@ -69,6 +77,16 @@ pub(crate) async fn get_book(
                     img style="height: 24rem" src=(image_url) alt="cover art";
                 }
                 .container {
+                    @if let Some((name, idx, id)) = series {
+                        span .fs-3 {
+                            a .link-light.link-offset-1
+                                href=(format!("/series/{id}")) {
+                                (name)
+                            }
+                            (format!(" #{idx}"))
+                        }
+                        br;
+                    }
                     @for (i, author) in authors.iter().enumerate() {
                         @if i != 0 {
                             ", "
