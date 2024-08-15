@@ -23,6 +23,8 @@ diesel::table! {
         amazonid -> Nullable<Text>,
         librarythingid -> Nullable<Text>,
         pagecount -> Nullable<Int4>,
+        owned -> Bool,
+        read -> Bool,
     }
 }
 

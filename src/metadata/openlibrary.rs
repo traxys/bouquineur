@@ -234,6 +234,8 @@ pub(super) async fn fetch_metadata(
         amazon_id: None,
         google_id: None,
         librarything_id: None,
+        owned: false,
+        read: false,
         covert_art_b64,
     }))
 }

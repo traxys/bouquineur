@@ -100,6 +100,8 @@ pub struct BookPreview {
     pub isbn: String,
     pub title: String,
     pub published: Option<NaiveDate>,
+    pub owned: bool,
+    pub read: bool,
 }
 
 #[derive(Selectable, Queryable, Identifiable)]
@@ -118,6 +120,8 @@ pub struct BookComplete {
     pub amazonid: Option<String>,
     pub librarythingid: Option<String>,
     pub pagecount: Option<i32>,
+    pub owned: bool,
+    pub read: bool,
 }
 
 #[derive(Insertable, Selectable, Queryable, Debug, AsChangeset)]
@@ -136,6 +140,8 @@ pub struct Book {
     pub amazonid: Option<String>,
     pub librarythingid: Option<String>,
     pub pagecount: Option<i32>,
+    pub owned: bool,
+    pub read: bool,
 }
 
 #[derive(Queryable, Identifiable, Selectable, Debug)]

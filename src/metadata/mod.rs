@@ -19,6 +19,8 @@ pub struct NullableBookDetails {
     pub amazon_id: Option<String>,
     pub librarything_id: Option<String>,
     pub page_count: Option<i32>,
+    pub read: bool,
+    pub owned: bool,
     pub covert_art_b64: Option<String>,
 }
 

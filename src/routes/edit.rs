@@ -215,6 +215,8 @@ pub(crate) async fn edit_book(
         amazon_id: book.amazonid,
         librarything_id: book.librarythingid,
         page_count: book.pagecount,
+        owned: book.owned,
+        read: book.read,
         covert_art_b64,
     };
 

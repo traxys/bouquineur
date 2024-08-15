@@ -82,6 +82,8 @@ fn parse_opf(
         librarything_id: None,
         // TODO: Find if there is a property for this
         page_count: None,
+        owned: false,
+        read: false,
         covert_art_b64: if cover_art.is_empty() {
             None
         } else {

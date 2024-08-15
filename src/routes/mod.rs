@@ -329,6 +329,8 @@ impl FromRequest<Arc<AppState>> for BookInfo {
             page_count: Option<i32>,
             series_name: Option<String>,
             series_volume: Option<i32>,
+            owned_box: bool,
+            read_box: bool,
         }
 
         let mut data = BookData::default();
@@ -385,6 +387,8 @@ impl FromRequest<Arc<AppState>> for BookInfo {
                         data.series_volume = Some(text.parse()?);
                     }
                 }
+                "owned_box" => data.owned_box = true,
+                "read_box" => data.read_box = true,
                 _ => {
                     tracing::warn!("Unknown field {:?}", field.name());
                 }
@@ -403,6 +407,8 @@ impl FromRequest<Arc<AppState>> for BookInfo {
             amazonid: data.amazon_id,
             librarythingid: data.librarything_id,
             pagecount: data.page_count,
+            owned: data.owned_box,
+            read: data.read_box,
         };
 
         let image = match data.cover_art {

@@ -99,6 +99,15 @@ pub(crate) async fn get_book(
                         }
                     }
                     br;
+                    @if book.owned || book.read {
+                        @if book.owned {
+                            .span .badge.text-bg-info.me-2 { "Owned" }
+                        }
+                        @if book.read {
+                            .span .badge.text-bg-info.me-2 { "Read" }
+                        }
+                        br;
+                    }
                     @for tag in tags {
                         span .badge.text-bg-primary.me-2 { (tag) }
                     }

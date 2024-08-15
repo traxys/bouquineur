@@ -216,6 +216,14 @@ pub async fn book_form(
                 }
                 label for="summary" { "Summary" }
             }
+            .form-check {
+                input .form-check-input type="checkbox" name="read_box" #readBox checked[details.read];
+                label .form-check-label for="readBox" { "Read" }
+            }
+            .form-check {
+                input .form-check-input type="checkbox" name="owned_box" #ownedBox checked[details.owned];
+                label .form-check-label for="ownedBox" { "Owned" }
+            }
             .row."g-2"."mb-2" {
                 .col {
                     input #seriesInput .form-control.awesomplete."me-1" list="seriesList" name="series_name"
@@ -393,14 +401,26 @@ where
                                     }
                                 }
                             }
-                            @if let Some(series) = series {
-                                .card-footer {
-                                    a href=(format!("/series/{}", series.series))
-                                      .link-light
-                                      data-bs-toggle="tooltip"
-                                      data-bs-title=(format!("{} #{}", series.name, series.volume))
-                                    {
-                                        i .bi.bi-collection {}
+                            @if series.is_some() || book.read || book.owned {
+                                .card-footer.d-flex.justify-content-evenly {
+                                    @if let Some(series) = series {
+                                        a href=(format!("/series/{}", series.series))
+                                          .link-light
+                                          data-bs-toggle="tooltip"
+                                          data-bs-title=(format!("{} #{}", series.name, series.volume))
+                                        {
+                                            i .bi.bi-collection {}
+                                        }
+                                    }
+                                    @if book.owned {
+                                        i .bi.bi-check-circle
+                                            data-bs-toggle="tooltip" 
+                                            data-bs-title="Owned" {}
+                                    }
+                                    @if book.read {
+                                        i .bi.bi-book-fill
+                                            data-bs-toggle="tooltip" 
+                                            data-bs-title="Read" {}
                                     }
                                 }
                             }
