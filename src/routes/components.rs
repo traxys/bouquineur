@@ -248,7 +248,7 @@ pub async fn book_form(
                     }
                 }
                 .col {
-                    input #seriesVolume name="series_volume" .form-control placeholder="Series volume" 
+                    input #seriesVolume name="series_volume" .form-control placeholder="Series volume"
                         type="number" value=[series_number];
                 }
                 script {
@@ -404,10 +404,7 @@ where
                                     }
                                 }
                                 p .card-text {
-                                    @for (i, author) in authors.iter().enumerate() {
-                                        @if i != 0 {
-                                            ", "
-                                        }
+                                    @for author in authors {
                                         a href=(format!("/author/{}", author.id))
                                           .nav-link {
                                             (author.name)
@@ -428,12 +425,12 @@ where
                                     }
                                     @if book.owned {
                                         i .bi.bi-check-circle
-                                            data-bs-toggle="tooltip" 
+                                            data-bs-toggle="tooltip"
                                             data-bs-title="Owned" {}
                                     }
                                     @if book.read {
                                         i .bi.bi-book-fill
-                                            data-bs-toggle="tooltip" 
+                                            data-bs-toggle="tooltip"
                                             data-bs-title="Read" {}
                                     }
                                 }
