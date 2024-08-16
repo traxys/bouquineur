@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use diesel::{
-    backend::Backend, expression::AsExpression, prelude::*, serialize::ToSql, sql_types::Text,
+    backend::Backend, expression::AsExpression, prelude::*, serialize::ToSql, sql_types::{Citext, Text},
 };
 use uuid::Uuid;
 
@@ -30,15 +30,15 @@ pub struct Author {
 #[derive(Insertable, AsExpression, Debug)]
 #[diesel(table_name = crate::schema::author)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-#[diesel(sql_type = Text)]
+#[diesel(sql_type = Citext)]
 pub struct AuthorName {
     pub name: String,
 }
 
-impl<DB> ToSql<Text, DB> for AuthorName
+impl<DB> ToSql<Citext, DB> for AuthorName
 where
     DB: Backend,
-    String: ToSql<Text, DB>,
+    String: ToSql<Citext, DB>,
 {
     fn to_sql<'b>(
         &'b self,

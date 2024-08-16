@@ -3,7 +3,7 @@
 diesel::table! {
     author (id) {
         id -> Int4,
-        name -> Text,
+        name -> Citext,
     }
 }
 
@@ -54,7 +54,7 @@ diesel::table! {
     series (id) {
         id -> Uuid,
         owner -> Uuid,
-        name -> Text,
+        name -> Citext,
     }
 }
 
