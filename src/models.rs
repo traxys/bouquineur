@@ -1,6 +1,10 @@
 use chrono::NaiveDate;
 use diesel::{
-    backend::Backend, expression::AsExpression, prelude::*, serialize::ToSql, sql_types::{Citext, Text},
+    backend::Backend,
+    expression::AsExpression,
+    prelude::*,
+    serialize::ToSql,
+    sql_types::{Citext, Text},
 };
 use uuid::Uuid;
 
