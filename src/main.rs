@@ -214,6 +214,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/images/not_found", get(routes::image_not_found))
         .route("/images/:id", get(routes::image))
         .route("/book/:id", get(routes::get_book))
+        .route("/unread", get(routes::unread))
         .route(
             "/book/:id/edit",
             get(routes::edit_book).post(routes::do_edit_book),

@@ -39,6 +39,7 @@ mod get_author;
 mod get_book;
 mod get_series;
 mod icons;
+mod unread;
 
 mod components;
 
@@ -48,6 +49,7 @@ pub(crate) use edit_series::{do_series_edit, series_edit};
 pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 pub(crate) use get_series::get_series;
+pub(crate) use unread::unread;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum RouteError {
@@ -128,16 +130,18 @@ enum Page {
     Books,
     Series,
     AddBook,
+    Unread,
 }
 
 impl Page {
     fn variants() -> &'static [Self] {
-        &[Self::Books, Self::Series, Self::AddBook]
+        &[Self::Books, Self::Unread, Self::Series, Self::AddBook]
     }
 
     pub fn name(&self) -> &'static str {
         match self {
             Page::Books => "Books",
+            Page::Unread => "Unread",
             Page::Series => "Series",
             Page::AddBook => "Add a Book",
         }
@@ -146,6 +150,7 @@ impl Page {
     pub fn location(&self) -> &'static str {
         match self {
             Page::Books => "/",
+            Page::Unread => "/unread",
             Page::AddBook => "/add",
             Page::Series => "/series",
         }

@@ -170,7 +170,9 @@ pub struct BookSeries {
     pub number: i32,
 }
 
-#[derive(Insertable, Identifiable, Selectable, Queryable, Debug, QueryableByName)]
+#[derive(
+    Insertable, Identifiable, Selectable, Queryable, Debug, QueryableByName, Hash, PartialEq, Eq,
+)]
 #[diesel(table_name = crate::schema::series)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct SeriesInfo {
