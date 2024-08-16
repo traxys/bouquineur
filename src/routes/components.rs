@@ -151,6 +151,17 @@ fn list_input(
                         {id}Add(value)
                     }}
                 }})
+
+                {id}Input.addEventListener("change", function(event) {{
+                    event.preventDefault();
+
+                    const value = {id}Input.value
+
+                    if (value == '')
+                        return
+
+                    {id}Add(value)
+                }})
             "#)))
         }
     }
