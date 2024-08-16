@@ -28,7 +28,7 @@ use uuid::Uuid;
 use crate::{
     metadata::MetadataError,
     models::{AuthorName, Book, BookPreview, NewUser, SeriesInfo, TagName, User},
-    schema::{book, users},
+    schema::{book, bookseries, users},
     AppState, State,
 };
 
@@ -481,6 +481,8 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
 
     let all_books: Vec<BookPreview> = book::table
         .filter(book::owner.eq(user.id))
+        .left_join(bookseries::table)
+        .order((bookseries::series, bookseries::number, book::title))
         .select(BookPreview::as_select())
         .load(&mut conn)
         .await?;
