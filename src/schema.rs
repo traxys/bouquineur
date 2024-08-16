@@ -72,6 +72,29 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    wish (id) {
+        id -> Uuid,
+        owner -> Uuid,
+        name -> Text,
+    }
+}
+
+diesel::table! {
+    wishauthor (wish, author) {
+        wish -> Uuid,
+        author -> Int4,
+    }
+}
+
+diesel::table! {
+    wishseries (wish) {
+        wish -> Uuid,
+        series -> Uuid,
+        number -> Int4,
+    }
+}
+
 diesel::joinable!(book -> users (owner));
 diesel::joinable!(bookauthor -> author (author));
 diesel::joinable!(bookauthor -> book (book));
@@ -80,6 +103,11 @@ diesel::joinable!(bookseries -> series (series));
 diesel::joinable!(booktag -> book (book));
 diesel::joinable!(booktag -> tag (tag));
 diesel::joinable!(series -> users (owner));
+diesel::joinable!(wish -> users (owner));
+diesel::joinable!(wishauthor -> author (author));
+diesel::joinable!(wishauthor -> wish (wish));
+diesel::joinable!(wishseries -> series (series));
+diesel::joinable!(wishseries -> wish (wish));
 
 diesel::allow_tables_to_appear_in_same_query!(
     author,
@@ -90,4 +118,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     series,
     tag,
     users,
+    wish,
+    wishauthor,
+    wishseries,
 );
