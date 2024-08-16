@@ -171,6 +171,8 @@ pub async fn book_form(
     let tags = tag_list(state, user).await?;
     let series = series_list(state, user).await?;
 
+    let (series_name, series_number) = details.series.unzip();
+
     Ok(
         html! { form .container-sm.align-items-center method="POST" enctype="multipart/form-data" .mt-2 {
             .text-center.d-flex.flex-column."mb-2" {
@@ -227,7 +229,7 @@ pub async fn book_form(
             .row."g-2"."mb-2" {
                 .col {
                     input #seriesInput .form-control.awesomplete."me-1" list="seriesList" name="series_name"
-                        placeholder="Series";
+                        placeholder="Series" value=[series_name];
                     datalist #seriesList {
                         @for series in series {
                             option { (series) }
@@ -235,7 +237,8 @@ pub async fn book_form(
                     }
                 }
                 .col {
-                    input #seriesVolume name="series_volume" .form-control placeholder="Series volume" type="number";
+                    input #seriesVolume name="series_volume" .form-control placeholder="Series volume" 
+                        type="number" value=[series_number];
                 }
                 script {
                     (PreEscaped(r#"

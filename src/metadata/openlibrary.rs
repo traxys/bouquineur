@@ -237,6 +237,7 @@ pub(super) async fn fetch_metadata(
         owned: false,
         read: false,
         covert_art_b64,
+        series: None,
     }))
 }
 

@@ -178,6 +178,14 @@ pub(crate) async fn edit_book(
             _ => RouteError::from(e),
         })?;
 
+    let series = bookseries::table
+        .find(*id)
+        .inner_join(series::table)
+        .select((series::name, bookseries::number))
+        .get_result(&mut conn)
+        .await
+        .optional()?;
+
     let authors = BookAuthor::belonging_to(&book)
         .inner_join(author::table)
         .select(author::name)
@@ -218,6 +226,7 @@ pub(crate) async fn edit_book(
         owned: book.owned,
         read: book.read,
         covert_art_b64,
+        series,
     };
 
     Ok(app_page(

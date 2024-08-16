@@ -89,6 +89,7 @@ fn parse_opf(
         } else {
             Some(BASE64_STANDARD.encode(cover_art))
         },
+        series: None,
     }))
 }
 

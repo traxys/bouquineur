@@ -22,6 +22,7 @@ pub struct NullableBookDetails {
     pub read: bool,
     pub owned: bool,
     pub covert_art_b64: Option<String>,
+    pub series: Option<(String, i32)>,
 }
 
 #[derive(thiserror::Error, Debug)]
