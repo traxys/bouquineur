@@ -34,6 +34,7 @@ use crate::{
 
 mod add;
 mod edit;
+mod edit_series;
 mod get_author;
 mod get_book;
 mod get_series;
@@ -43,6 +44,7 @@ mod components;
 
 pub(crate) use add::{add_book, do_add_book};
 pub(crate) use edit::{do_edit_book, edit_book};
+pub(crate) use edit_series::{do_series_edit, series_edit};
 pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 pub(crate) use get_series::get_series;

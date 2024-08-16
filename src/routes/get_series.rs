@@ -45,7 +45,10 @@ pub(crate) async fn get_series(
         &user,
         html! {
             .text-center {
-                h2 { (series_info) }
+                h2 { 
+                    (series_info) 
+                    a .ms-2.btn.btn-primary href=(format!("{}/edit", *id)) { i .bi.bi-pencil {} }
+                }
                 (book_cards_for(&state, &user, &series, NO_SORT).await?)
             }
         },
