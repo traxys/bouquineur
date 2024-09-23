@@ -55,6 +55,8 @@ diesel::table! {
         id -> Uuid,
         owner -> Uuid,
         name -> Citext,
+        ongoing -> Bool,
+        total_count -> Nullable<Int4>,
     }
 }
 

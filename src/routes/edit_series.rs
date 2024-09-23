@@ -12,11 +12,33 @@ use crate::{
 
 use super::{app_page, RouteError};
 
-#[derive(serde::Deserialize, diesel::AsChangeset)]
-#[diesel(table_name = crate::schema::series)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[derive(serde::Serialize, serde::Deserialize)]
+enum CheckboxTick {
+    #[serde(rename = "on")]
+    On,
+}
+
+#[derive(serde::Deserialize)]
 pub(crate) struct SeriesForm {
     name: String,
+    ongoing_box: Option<CheckboxTick>,
+}
+
+impl SeriesForm {
+    fn changeset(self) -> SeriesEdit {
+        SeriesEdit {
+            name: self.name,
+            ongoing: self.ongoing_box.is_some(),
+        }
+    }
+}
+
+#[derive(diesel::AsChangeset)]
+#[diesel(table_name = crate::schema::series)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+struct SeriesEdit {
+    name: String,
+    ongoing: bool,
 }
 
 pub(crate) async fn do_series_edit(
@@ -29,7 +51,7 @@ pub(crate) async fn do_series_edit(
 
     diesel::update(series::table)
         .filter(series::id.eq(*id).and(series::owner.eq(user.id)))
-        .set(form)
+        .set(form.changeset())
         .execute(&mut conn)
         .await?;
 
@@ -58,14 +80,20 @@ pub(crate) async fn series_edit(
         super::Page::Series,
         &user,
         html! {
-            .container.text-center {
-                h1 { "Edit Series" }
-                form method="POST" {
-                    .form-floating.mb-2 {
-                        input .form-control required #name name="name" type="text" placeholder="Name"
-                            value=(s.name);
-                        label for="name" { "Name" }
-                    }
+            form .container-sm.align-items-center method="POST" {
+                .container.text-center {
+                    h1 { "Edit Series" }
+                }
+                .form-floating.mb-2 {
+                    input .form-control required #name name="name" type="text" placeholder="Name"
+                        value=(s.name);
+                    label for="name" { "Name" }
+                }
+                .form-check {
+                    input .form-check-input type="checkbox" name="ongoing_box" #ongoingBox checked[s.ongoing];
+                    label .form-check-label for="ongoingBox" { "Ongoing" }
+                }
+                .container.text-center {
                     input  type="submit" .btn.btn-primary value="Edit series";
                 }
             }

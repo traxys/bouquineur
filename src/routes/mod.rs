@@ -523,7 +523,7 @@ pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, Rou
     let series = diesel::sql_query(
         r#"
         SELECT 
-            book, bs.series as id, series.name as name
+            book, bs.series as id, series.name as name, ongoing
         FROM 
             bookseries bs 
         INNER JOIN 
@@ -568,6 +568,15 @@ pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, Rou
                                         h6 .card-title {
                                             a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
                                                 (series.name)
+                                            }
+                                        }
+                                    }
+                                    @if series.ongoing {
+                                        .card-footer.d-flex-justify-content-evenly {
+                                            @if series.ongoing {
+                                                i .bi.bi-journal-plus
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-title="Ongoing" {}
                                             }
                                         }
                                     }

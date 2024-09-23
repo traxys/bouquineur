@@ -182,4 +182,5 @@ pub struct BookSeries {
 pub struct SeriesInfo {
     pub id: Uuid,
     pub name: String,
+    pub ongoing: bool,
 }

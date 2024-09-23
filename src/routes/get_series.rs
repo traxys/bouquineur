@@ -5,7 +5,7 @@ use maud::html;
 use uuid::Uuid;
 
 use crate::{
-    models::{BookPreview, User},
+    models::{BookPreview, SeriesInfo, User},
     routes::components::{book_cards_for, NO_SORT},
     schema::{book, bookseries, series},
     State,
@@ -20,10 +20,10 @@ pub(crate) async fn get_series(
 ) -> Result<maud::Markup, RouteError> {
     let mut conn = state.db.get().await?;
 
-    let series_info: String = series::table
+    let series_info = series::table
         .find(*id)
         .filter(series::owner.eq(user.id))
-        .select(series::name)
+        .select(SeriesInfo::as_select())
         .get_result(&mut conn)
         .await
         .map_err(|e| match e {
@@ -45,8 +45,11 @@ pub(crate) async fn get_series(
         &user,
         html! {
             .text-center {
-                h2 { 
-                    (series_info) 
+                h2 {
+                    (series_info.name)
+                    @if series_info.ongoing {
+                        " (Ongoing)"
+                    }
                     a .ms-2.btn.btn-primary href=(format!("{}/edit", *id)) { i .bi.bi-pencil {} }
                 }
                 (book_cards_for(&state, &user, &series, NO_SORT).await?)
