@@ -44,17 +44,21 @@ pub(crate) async fn do_add_book(
 
             if let Some((name, volume)) = data.series {
                 let series = Series {
-                    name,
+                    name: name.clone(),
                     owner: user.id,
+                    ongoing: Some(false),
                 };
 
-                let series_id = diesel::insert_into(series::table)
+                diesel::insert_into(series::table)
                     .values(&series)
-                    .on_conflict((series::owner, series::name))
-                    .do_update()
-                    .set(&series)
-                    .returning(series::id)
-                    .get_result(c)
+                    .on_conflict_do_nothing()
+                    .execute(c)
+                    .await?;
+
+                let series_id = series::table
+                    .filter(series::owner.eq(user.id).and(series::name.eq(&name)))
+                    .select(series::id)
+                    .first(c)
                     .await?;
 
                 let book_series = BookSeries {

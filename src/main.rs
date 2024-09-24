@@ -226,6 +226,7 @@ async fn main() -> anyhow::Result<()> {
             get(routes::series_edit).post(routes::do_series_edit),
         )
         .route("/author/:id", get(routes::get_author))
+        .route("/ongoing", get(routes::ongoing))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await

@@ -18,7 +18,7 @@ use axum::{
 use base64::prelude::*;
 use chrono::NaiveDate;
 use components::{book_cards_for, NO_SORT};
-use diesel::prelude::*;
+use diesel::{prelude::*, sql_types};
 use diesel_async::pooled_connection::deadpool::PoolError;
 use diesel_async::RunQueryDsl;
 use maud::{html, Markup};
@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use crate::{
     metadata::MetadataError,
-    models::{AuthorName, Book, BookPreview, NewUser, SeriesInfo, TagName, User},
+    models::{AuthorName, Book, BookPreview, NewUser, TagName, User},
     schema::{book, bookseries, users},
     AppState, State,
 };
@@ -39,6 +39,7 @@ mod get_author;
 mod get_book;
 mod get_series;
 mod icons;
+mod ongoing;
 mod unread;
 
 mod components;
@@ -49,6 +50,7 @@ pub(crate) use edit_series::{do_series_edit, series_edit};
 pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 pub(crate) use get_series::get_series;
+pub(crate) use ongoing::ongoing;
 pub(crate) use unread::unread;
 
 #[derive(thiserror::Error, Debug)]
@@ -131,11 +133,18 @@ enum Page {
     Series,
     AddBook,
     Unread,
+    Ongoing,
 }
 
 impl Page {
     fn variants() -> &'static [Self] {
-        &[Self::Books, Self::Unread, Self::Series, Self::AddBook]
+        &[
+            Self::Books,
+            Self::Unread,
+            Self::Series,
+            Self::Ongoing,
+            Self::AddBook,
+        ]
     }
 
     pub fn name(&self) -> &'static str {
@@ -144,6 +153,7 @@ impl Page {
             Page::Unread => "Unread",
             Page::Series => "Series",
             Page::AddBook => "Add a Book",
+            Page::Ongoing => "Ongoing",
         }
     }
 
@@ -153,6 +163,7 @@ impl Page {
             Page::Unread => "/unread",
             Page::AddBook => "/add",
             Page::Series => "/series",
+            Page::Ongoing => "/ongoing",
         }
     }
 }
@@ -510,20 +521,35 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
     ))
 }
 
-pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, RouteError> {
-    let mut conn = state.db.get().await?;
+#[derive(QueryableByName)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct SeriesAllInfo {
+    #[diesel(sql_type = sql_types::Uuid)]
+    pub id: Uuid,
+    #[diesel(sql_type = sql_types::VarChar)]
+    pub name: String,
+    #[diesel(sql_type = sql_types::Bool)]
+    pub ongoing: bool,
+    #[diesel(sql_type = sql_types::BigInt)]
+    pub owned_count: i64,
+    #[diesel(sql_type = sql_types::Uuid)]
+    pub first_volume: Uuid,
+    #[diesel(sql_type = sql_types::Nullable<sql_types::Integer>)]
+    pub total_count: Option<i32>,
+}
 
-    #[derive(QueryableByName, Debug)]
-    #[diesel(table_name = crate::schema::bookseries)]
-    #[diesel(check_for_backend(diesel::pg::Pg))]
-    struct BookSeriesBook {
-        book: Uuid,
-    }
+async fn series_info(state: &State) -> Result<Vec<SeriesAllInfo>, RouteError> {
+    let mut conn = state.db.get().await?;
 
     let series = diesel::sql_query(
         r#"
         SELECT 
-            book, bs.series as id, series.name as name, ongoing
+            bs.book as first_volume,
+            bs.series as id,
+            series.name as name,
+            ongoing,
+            total_count,
+            COALESCE(owned_count, 0) as owned_count
         FROM 
             bookseries bs 
         INNER JOIN 
@@ -531,25 +557,25 @@ pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, Rou
             ON b.series = bs.series AND bs.number = b.minvolume 
         INNER JOIN 
             series 
-            ON series.id = bs.series;
+            ON series.id = bs.series
+        LEFT JOIN
+            (
+                SELECT series, COUNT(book) as owned_count
+                FROM bookseries 
+                INNER JOIN book ON book.id = bookseries.book AND book.owned
+                GROUP BY series
+            ) as owned_book_count
+            ON owned_book_count.series = bs.series;
     "#,
     )
-    .get_results::<(BookSeriesBook, SeriesInfo)>(&mut conn)
+    .get_results::<SeriesAllInfo>(&mut conn)
     .await?;
 
-    let make_image_url = |id: Uuid| {
-        let image_path = state
-            .config
-            .metadata
-            .image_dir
-            .join(user.id.to_string())
-            .join(format!("{id}.jpg"));
+    Ok(series)
+}
 
-        match image_path.exists() {
-            true => format!("/images/{id}"),
-            false => "/images/not_found".to_string(),
-        }
-    };
+pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, RouteError> {
+    let series = series_info(&state).await?;
 
     Ok(app_page(
         Page::Series,
@@ -557,34 +583,7 @@ pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, Rou
         html! {
             .text-center {
                 h2 { "Series" }
-                .container {
-                    .row.row-cols-auto.justify-content-center.justify-content-md-start {
-                        @for (first_volume, series) in series {
-                            .col."mb-2" {
-                                .card."h-100" style="width: 9.6rem;" {
-                                    img src=(make_image_url(first_volume.book)) .card-img-top
-                                        alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
-                                    .card-body {
-                                        h6 .card-title {
-                                            a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
-                                                (series.name)
-                                            }
-                                        }
-                                    }
-                                    @if series.ongoing {
-                                        .card-footer.d-flex-justify-content-evenly {
-                                            @if series.ongoing {
-                                                i .bi.bi-journal-plus
-                                                    data-bs-toggle="tooltip"
-                                                    data-bs-title="Ongoing" {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                (components::series_cards(&state, &user, &series))
             }
         },
     ))

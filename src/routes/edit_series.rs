@@ -18,16 +18,45 @@ enum CheckboxTick {
     On,
 }
 
+fn empty_string_as_none<'de, D>(de: D) -> Result<Option<i32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct OptI32Visitor;
+    impl<'de> serde::de::Visitor<'de> for OptI32Visitor {
+        type Value = Option<i32>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "an empty string or integer")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            match v {
+                "" => Ok(None),
+                v => v.parse().map_err(E::custom).map(Some),
+            }
+        }
+    }
+
+    de.deserialize_any(OptI32Visitor)
+}
+
 #[derive(serde::Deserialize)]
 pub(crate) struct SeriesForm {
     name: String,
     ongoing_box: Option<CheckboxTick>,
+    #[serde(deserialize_with = "empty_string_as_none")]
+    total_count: Option<i32>,
 }
 
 impl SeriesForm {
     fn changeset(self) -> SeriesEdit {
         SeriesEdit {
             name: self.name,
+            total_count: self.total_count,
             ongoing: self.ongoing_box.is_some(),
         }
     }
@@ -39,6 +68,8 @@ impl SeriesForm {
 struct SeriesEdit {
     name: String,
     ongoing: bool,
+    #[diesel(treat_none_as_null = true)]
+    total_count: Option<i32>,
 }
 
 pub(crate) async fn do_series_edit(
@@ -92,6 +123,11 @@ pub(crate) async fn series_edit(
                 .form-check {
                     input .form-check-input type="checkbox" name="ongoing_box" #ongoingBox checked[s.ongoing];
                     label .form-check-label for="ongoingBox" { "Ongoing" }
+                }
+                .form-floating."mb-2" {
+                    input .form-control required #totalCount name="total_count" type="number"
+                            placeholder="Total Count" value=[s.total_count];
+                    label for="totalCount" { "Total Count" }
                 }
                 .container.text-center {
                     input  type="submit" .btn.btn-primary value="Edit series";

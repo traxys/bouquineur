@@ -12,7 +12,7 @@ use crate::{
     State,
 };
 
-use super::{RouteError, NO_COVER};
+use super::{RouteError, SeriesAllInfo, NO_COVER};
 
 async fn author_list(state: &State, user: &User) -> Result<Vec<String>, RouteError> {
     let mut conn = state.db.get().await?;
@@ -313,8 +313,66 @@ pub async fn book_form(
     )
 }
 
-pub const NO_SORT: Option<fn(&BookPreview, &BookPreview) -> std::cmp::Ordering> = None;
+fn make_image_url(state: &State, book: Uuid, user: &User) -> String {
+    let image_path = state
+        .config
+        .metadata
+        .image_dir
+        .join(user.id.to_string())
+        .join(format!("{}.jpg", book));
 
+    match image_path.exists() {
+        true => format!("/images/{}", book),
+        false => "/images/not_found".to_string(),
+    }
+}
+
+pub fn series_cards(state: &State, user: &User, series: &[SeriesAllInfo]) -> maud::Markup {
+    html! {
+        .container {
+            .row.row-cols-auto.justify-content-center.justify-content-md-start {
+                @for series in series {
+                    .col."mb-2" {
+                        .card."h-100" style="width: 9.6rem;" {
+                            img src=(make_image_url(state, series.first_volume, user)) .card-img-top
+                                alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
+                            .card-body {
+                                h6 .card-title {
+                                    a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
+                                        (series.name)
+                                    }
+                                }
+                            }
+                            @let missing_entries = match series.total_count {
+                                None => false,
+                                Some(i) => i as i64 != series.owned_count,
+                            };
+                            @if series.ongoing || missing_entries {
+                                .card-footer.d-flex.justify-content-evenly {
+                                    @if series.ongoing {
+                                        i .bi.bi-journal-plus
+                                            data-bs-toggle="tooltip"
+                                            data-bs-title="Ongoing" {}
+                                    }
+                                    @if missing_entries {
+                                        i .bi.bi-book-half
+                                            data-bs-toggle="tooltip"
+                                            data-bs-title=(
+                                                format!("{}/{}", series.owned_count,
+                                                                 series.total_count.unwrap())
+                                            ) {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub const NO_SORT: Option<fn(&BookPreview, &BookPreview) -> std::cmp::Ordering> = None;
 pub async fn book_cards_for<F>(
     state: &State,
     user: &User,
@@ -364,21 +422,9 @@ where
         .into_iter()
         .zip(books)
         .map(|(a, book)| {
-            let image_path = state
-                .config
-                .metadata
-                .image_dir
-                .join(user.id.to_string())
-                .join(format!("{}.jpg", book.id));
-
-            let image_url = match image_path.exists() {
-                true => format!("/images/{}", book.id),
-                false => "/images/not_found".to_string(),
-            };
-
             Ok((
                 book,
-                image_url,
+                make_image_url(state, book.id, user),
                 a.into_iter().map(|(_, author)| author).collect::<Vec<_>>(),
                 book_series.get(&book.id),
             ))

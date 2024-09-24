@@ -161,6 +161,7 @@ pub struct BookId {
 pub struct Series {
     pub owner: Uuid,
     pub name: String,
+    pub ongoing: Option<bool>,
 }
 
 #[derive(Insertable, AsChangeset, Associations, Identifiable, Selectable, Queryable, Debug)]
@@ -183,4 +184,5 @@ pub struct SeriesInfo {
     pub id: Uuid,
     pub name: String,
     pub ongoing: bool,
+    pub total_count: Option<i32>,
 }
