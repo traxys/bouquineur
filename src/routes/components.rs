@@ -354,7 +354,7 @@ pub fn series_cards(state: &State, user: &User, series: &[SeriesAllInfo]) -> mau
                                             data-bs-toggle="tooltip"
                                             data-bs-title="Ongoing" {}
                                     }
-                                    @if missing_entries {
+                                    @if missing_entries || series.ongoing {
                                         i .bi.bi-book-half
                                             data-bs-toggle="tooltip"
                                             data-bs-title=(
