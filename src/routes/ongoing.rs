@@ -12,11 +12,12 @@ pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, Ro
     let series = series_info(&state).await?;
     let mut conn = state.db.get().await?;
 
-    let (mut all_owned, missing): (Vec<_>, _) = series
+    let (mut all_owned, mut missing): (Vec<_>, _) = series
         .into_iter()
         .partition(|s| s.total_count.map(|t| t as i64) == Some(s.owned_count));
 
     all_owned.retain(|s| s.ongoing);
+    missing.retain(|s| s.total_count.is_some());
 
     let mut missing_ids = match missing.is_empty() {
         true => String::new(),
