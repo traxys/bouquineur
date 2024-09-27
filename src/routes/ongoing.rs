@@ -38,8 +38,11 @@ pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, Ro
         number: i32,
     }
 
-    let missing_books = diesel::sql_query(format!(
-        r#"
+    let mut missing_volumes_table = if missing.is_empty() {
+        Default::default()
+    } else {
+        let missing_books = diesel::sql_query(format!(
+            r#"
         SELECT id as series, number 
         FROM series, generate_series(1, total_count) as number 
         WHERE total_count IS NOT NULL
@@ -47,17 +50,20 @@ pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, Ro
         EXCEPT
         SELECT series, number FROM bookseries;
     "#
-    ))
-    .get_results::<MissingVolume>(&mut conn)
-    .await?;
+        ))
+        .get_results::<MissingVolume>(&mut conn)
+        .await?;
 
-    let mut missing_volumes_table = HashMap::<_, Vec<_>>::new();
-    for missing in missing_books {
+        let mut missing_volumes_table = HashMap::<_, Vec<_>>::new();
+        for missing in missing_books {
+            missing_volumes_table
+                .entry(missing.series)
+                .or_default()
+                .push(missing.number);
+        }
+
         missing_volumes_table
-            .entry(missing.series)
-            .or_default()
-            .push(missing.number);
-    }
+    };
 
     missing_volumes_table
         .values_mut()
