@@ -40,6 +40,7 @@ mod get_book;
 mod get_series;
 mod icons;
 mod ongoing;
+mod profile;
 mod unread;
 
 mod components;
@@ -52,6 +53,7 @@ pub(crate) use get_book::get_book;
 pub(crate) use get_series::get_series;
 pub(crate) use ongoing::ongoing;
 pub(crate) use unread::unread;
+pub(crate) use profile::profile;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum RouteError {
@@ -127,7 +129,7 @@ impl IntoResponse for RouteError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum Page {
     Books,
     Series,
@@ -236,7 +238,7 @@ fn base_page(body: Markup) -> Markup {
     base_page_with_head(body, None)
 }
 
-fn app_page(page: Page, user: &User, body: Markup) -> Markup {
+fn raw_app_page(page: Option<Page>, user: &User, body: Markup) -> Markup {
     base_page(html! {
         .container-fluid {
             header .d-flex
@@ -252,7 +254,7 @@ fn app_page(page: Page, user: &User, body: Markup) -> Markup {
                 }
                 ul .nav.nav-pills."col-12".col-md-auto."mb-2".justify-content-center."mb-md-0" {
                     @for p in Page::variants() {
-                        @let current = *p == page;
+                        @let current = Some(*p) == page;
                         li .nav-item {
                             a .nav-link.active[current]
                                 aria-current=[current.then(|| "page")]
@@ -263,12 +265,16 @@ fn app_page(page: Page, user: &User, body: Markup) -> Markup {
                     }
                 }
                 ."col-md-3".text-end."me-2" {
-                    span .align-middle { (user.name) }
+                    a href="/profile" .align-middle.link-light { (user.name) }
                 }
             }
             (body)
         }
     })
+}
+
+fn app_page(page: Page, user: &User, body: Markup) -> Markup {
+    raw_app_page(Some(page), user, body)
 }
 
 #[async_trait]
