@@ -313,7 +313,7 @@ pub async fn book_form(
     )
 }
 
-fn make_image_url(state: &State, book: Uuid, user: &User) -> String {
+pub fn make_image_url(state: &State, book: Uuid, user: &User) -> String {
     let image_path = state
         .config
         .metadata

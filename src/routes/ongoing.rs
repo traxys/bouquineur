@@ -77,12 +77,24 @@ pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, Ro
                 h2 { "Ongoing Series" }
                 @if !missing.is_empty() {
                     h3 { "Missing Volumes" }
-                    .text-start.ms-3 {
+                    .ms-3 {
                         @for missing in missing {
-                            h4 { (missing.name) }
-                            ul .list-group.d-inline-block {
-                                @for v in missing_volumes_table.get(&missing.id).map(|s| -> &[_] { s }).unwrap_or_else(|| &[]) {
-                                    li .list-group-item { (format!("Volume {v}")) }
+                            .col."mb-2" {
+                                .card."h-100" style="width: 9.6rem;" {
+                                    img src=(components::make_image_url(&state, missing.first_volume, &user)) .card-img-top
+                                        alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
+                                    .card-body {
+                                        h6 .card-title {
+                                            a .nav-link.fs-5 href=(format!("/series/{}", missing.id)) {
+                                                (missing.name)
+                                            }
+                                        }
+                                    }
+                                    ul .list-group.d-inline-block {
+                                        @for v in missing_volumes_table.get(&missing.id).map(|s| -> &[_] { s }).unwrap_or_else(|| &[]) {
+                                            li .list-group-item { (format!("Volume {v}")) }
+                                        }
+                                    }
                                 }
                             }
                         }
