@@ -479,15 +479,14 @@ impl FromRequest<Arc<AppState>> for BookInfo {
 
 pub(crate) async fn image(
     state: State,
-    user: User,
-    book_id: Path<Uuid>,
+    Path((user_id, book_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, RouteError> {
     let image_path = state
         .config
         .metadata
         .image_dir
-        .join(user.id.to_string())
-        .join(format!("{}.jpg", *book_id));
+        .join(user_id.to_string())
+        .join(format!("{}.jpg", book_id));
 
     if !image_path.exists() {
         return Err(RouteError::NotFound);

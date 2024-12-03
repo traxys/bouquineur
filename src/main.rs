@@ -211,8 +211,8 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(routes::index))
         .route("/add", get(routes::add_book).post(routes::do_add_book))
-        .route("/images/not_found", get(routes::image_not_found))
-        .route("/images/:id", get(routes::image))
+        .route("/public/images/not_found", get(routes::image_not_found))
+        .route("/public/:user/images/:id", get(routes::image))
         .route("/book/:id", get(routes::get_book))
         .route("/unread", get(routes::unread))
         .route(

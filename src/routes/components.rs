@@ -322,8 +322,8 @@ pub fn make_image_url(state: &State, book: Uuid, user: &User) -> String {
         .join(format!("{}.jpg", book));
 
     match image_path.exists() {
-        true => format!("/images/{}", book),
-        false => "/images/not_found".to_string(),
+        true => format!("/public/{}/images/{}", user.id, book),
+        false => "/public/images/not_found".to_string(),
     }
 }
 

@@ -38,17 +38,7 @@ pub(crate) async fn get_book(
         .await
         .optional()?;
 
-    let image_path = state
-        .config
-        .metadata
-        .image_dir
-        .join(user.id.to_string())
-        .join(format!("{}.jpg", *id));
-
-    let image_url = match image_path.exists() {
-        true => format!("/images/{}", book.id),
-        false => "/images/not_found".to_string(),
-    };
+    let image_url = super::components::make_image_url(&state, *id, &user);
 
     let summary = ammonia::clean(&book.summary);
 
