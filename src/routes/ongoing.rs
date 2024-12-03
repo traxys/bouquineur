@@ -1,14 +1,20 @@
+use axum::extract::Path;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use maud::html;
 use std::{collections::HashMap, fmt::Write};
 use uuid::Uuid;
 
-use crate::{models::User, routes::components, State};
+use crate::{
+    models::User,
+    routes::{base_page, components},
+    schema::users,
+    State,
+};
 
 use super::{app_page, series_info, Page, RouteError};
 
-pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, RouteError> {
+async fn ongoing_core(state: State, user: User, private: bool) -> Result<maud::Markup, RouteError> {
     let series = series_info(&state).await?;
     let mut conn = state.db.get().await?;
 
@@ -69,42 +75,78 @@ pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, Ro
         .values_mut()
         .for_each(|v| v.sort_unstable());
 
-    Ok(app_page(
-        Page::Ongoing,
-        &user,
-        html! {
-            .container.text-center {
-                h2 { "Ongoing Series" }
-                @if !missing.is_empty() {
-                    h3 { "Missing Volumes" }
-                    .ms-3 {
-                        @for missing in missing {
-                            .col."mb-2" {
-                                .card."h-100" style="width: 9.6rem;" {
-                                    img src=(components::make_image_url(&state, missing.first_volume, &user)) .card-img-top
-                                        alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
-                                    .card-body {
-                                        h6 .card-title {
+    let body = html! {
+        .container.text-center {
+            h2 {
+                @if private {
+                    "Ongoing Series"
+                } else {
+                    (format!("Ongoing Series ({})", user.name))
+                }
+            }
+            @if !missing.is_empty() {
+                h3 { "Missing Volumes" }
+                .ms-3 {
+                    @for missing in missing {
+                        .col."mb-2" {
+                            .card."h-100" style="width: 9.6rem;" {
+                                img src=(components::make_image_url(&state, missing.first_volume, &user)) .card-img-top
+                                    alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
+                                .card-body {
+                                    h6 .card-title {
+                                        @if private {
                                             a .nav-link.fs-5 href=(format!("/series/{}", missing.id)) {
                                                 (missing.name)
                                             }
+                                        } else {
+                                            (missing.name)
                                         }
                                     }
-                                    ul .list-group.d-inline-block {
-                                        @for v in missing_volumes_table.get(&missing.id).map(|s| -> &[_] { s }).unwrap_or_else(|| &[]) {
-                                            li .list-group-item { (format!("Volume {v}")) }
-                                        }
+                                }
+                                ul .list-group.d-inline-block {
+                                    @for v in missing_volumes_table.get(&missing.id).map(|s| -> &[_] { s }).unwrap_or_else(|| &[]) {
+                                        li .list-group-item { (format!("Volume {v}")) }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                @if !all_owned.is_empty() {
-                    h3 { "All Owned" }
-                    (components::series_cards(&state, &user, &all_owned))
-                }
             }
-        },
-    ))
+            @if !all_owned.is_empty() {
+                h3 { "All Owned" }
+                (components::series_cards(&state, &user, &all_owned, private))
+            }
+        }
+    };
+
+    if private {
+        Ok(app_page(Page::Ongoing, &user, body))
+    } else {
+        Ok(base_page(body))
+    }
+}
+
+pub(crate) async fn ongoing(state: State, user: User) -> Result<maud::Markup, RouteError> {
+    ongoing_core(state, user, true).await
+}
+
+pub(crate) async fn ongoing_public(
+    state: State,
+    Path(user): Path<Uuid>,
+) -> Result<maud::Markup, RouteError> {
+    let mut conn = state.db.get().await?;
+
+    let user = users::table
+        .find(user)
+        .filter(users::public_ongoing.eq(true))
+        .select(User::as_select())
+        .get_result(&mut conn)
+        .await
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => RouteError::NotFound,
+            _ => e.into(),
+        })?;
+
+    ongoing_core(state, user, false).await
 }

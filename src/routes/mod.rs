@@ -51,7 +51,7 @@ pub(crate) use edit_series::{do_series_edit, series_edit};
 pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 pub(crate) use get_series::get_series;
-pub(crate) use ongoing::ongoing;
+pub(crate) use ongoing::{ongoing, ongoing_public};
 pub(crate) use profile::{do_edit_profile, profile};
 pub(crate) use unread::unread;
 
@@ -595,7 +595,7 @@ pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, Rou
         html! {
             .text-center {
                 h2 { "Series" }
-                (components::series_cards(&state, &user, &series))
+                (components::series_cards(&state, &user, &series, true))
             }
         },
     ))

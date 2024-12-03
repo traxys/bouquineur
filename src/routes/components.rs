@@ -327,7 +327,12 @@ pub fn make_image_url(state: &State, book: Uuid, user: &User) -> String {
     }
 }
 
-pub fn series_cards(state: &State, user: &User, series: &[SeriesAllInfo]) -> maud::Markup {
+pub fn series_cards(
+    state: &State,
+    user: &User,
+    series: &[SeriesAllInfo],
+    private: bool,
+) -> maud::Markup {
     html! {
         .container {
             .row.row-cols-auto.justify-content-center.justify-content-md-start {
@@ -338,7 +343,11 @@ pub fn series_cards(state: &State, user: &User, series: &[SeriesAllInfo]) -> mau
                                 alt="first volume cover" style="height: 14.4rem; width: 9.6rem;";
                             .card-body {
                                 h6 .card-title {
-                                    a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
+                                    @if private {
+                                        a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
+                                            (series.name)
+                                        }
+                                    } else {
                                         (series.name)
                                     }
                                 }

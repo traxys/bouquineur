@@ -227,6 +227,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/author/:id", get(routes::get_author))
         .route("/ongoing", get(routes::ongoing))
+        .route("/public/:user/ongoing", get(routes::ongoing_public))
         .route(
             "/profile",
             get(routes::profile).post(routes::do_edit_profile),

@@ -46,6 +46,8 @@ pub(crate) async fn profile(state: State, user: User) -> Result<maud::Markup, Ro
         .get_result(&mut conn)
         .await?;
 
+    let public_url = format!("/public/{}/ongoing", user.id);
+
     Ok(raw_app_page(
         None,
         &user,
@@ -57,6 +59,9 @@ pub(crate) async fn profile(state: State, user: User) -> Result<maud::Markup, Ro
                 .form-check {
                     input .form-check-input type="checkbox" name="ongoing_box" #ongoingBox checked[profile.public_ongoing];
                     label .form-check-label for="ongoingBox" { "Public Ongoing" }
+                    @if profile.public_ongoing {
+                        " " a href=(public_url) {"(Public URL)"}
+                    }
                 }
                 .container.text-center {
                     input  type="submit" .btn.btn-primary value="Edit profile";
