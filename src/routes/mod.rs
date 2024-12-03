@@ -52,8 +52,8 @@ pub(crate) use get_author::get_author;
 pub(crate) use get_book::get_book;
 pub(crate) use get_series::get_series;
 pub(crate) use ongoing::ongoing;
+pub(crate) use profile::{do_edit_profile, profile};
 pub(crate) use unread::unread;
-pub(crate) use profile::profile;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum RouteError {
@@ -127,6 +127,12 @@ impl IntoResponse for RouteError {
         )
             .into_response()
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+enum CheckboxTick {
+    #[serde(rename = "on")]
+    On,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]

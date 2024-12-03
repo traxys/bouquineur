@@ -12,12 +12,6 @@ use crate::{
 
 use super::{app_page, RouteError};
 
-#[derive(serde::Serialize, serde::Deserialize)]
-enum CheckboxTick {
-    #[serde(rename = "on")]
-    On,
-}
-
 fn empty_string_as_none<'de, D>(de: D) -> Result<Option<i32>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -47,7 +41,7 @@ where
 #[derive(serde::Deserialize)]
 pub(crate) struct SeriesForm {
     name: String,
-    ongoing_box: Option<CheckboxTick>,
+    ongoing_box: Option<super::CheckboxTick>,
     #[serde(deserialize_with = "empty_string_as_none")]
     total_count: Option<i32>,
 }

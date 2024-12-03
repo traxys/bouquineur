@@ -71,6 +71,7 @@ diesel::table! {
     users (id) {
         id -> Uuid,
         name -> Text,
+        public_ongoing -> Bool,
     }
 }
 
