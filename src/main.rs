@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, Context};
-use axum::{http::HeaderName, routing::get, Router};
+use axum::{extract::DefaultBodyLimit, http::HeaderName, routing::get, Router};
 use diesel::Connection;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
@@ -210,7 +210,12 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(routes::index))
-        .route("/add", get(routes::add_book).post(routes::do_add_book))
+        .route(
+            "/add",
+            get(routes::add_book)
+                .post(routes::do_add_book)
+                .layer(DefaultBodyLimit::max(20 * 1024 * 1024)),
+        )
         .route("/public/images/not_found", get(routes::image_not_found))
         .route("/public/{user}/images/{id}", get(routes::image))
         .route("/book/{id}", get(routes::get_book))
