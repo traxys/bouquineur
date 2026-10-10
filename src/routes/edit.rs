@@ -3,7 +3,7 @@ use std::{fs::OpenOptions, io::BufWriter};
 use axum::{extract::Path, response::Redirect};
 use base64::prelude::*;
 use diesel::prelude::*;
-use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
+use diesel_async::{AsyncConnection, RunQueryDsl};
 use maud::html;
 use uuid::Uuid;
 
@@ -36,128 +36,125 @@ pub(crate) async fn do_edit_book(
         return Err(RouteError::NotFound);
     }
 
-    conn.transaction(|c| {
-        async {
-            diesel::delete(bookauthor::table)
-                .filter(bookauthor::book.eq(*id))
-                .execute(c)
-                .await?;
+    conn.transaction(async |c| {
+        diesel::delete(bookauthor::table)
+            .filter(bookauthor::book.eq(*id))
+            .execute(c)
+            .await?;
 
-            diesel::delete(booktag::table)
-                .filter(booktag::book.eq(*id))
-                .execute(c)
-                .await?;
+        diesel::delete(booktag::table)
+            .filter(booktag::book.eq(*id))
+            .execute(c)
+            .await?;
 
-            diesel::insert_into(author::table)
-                .values(&data.authors)
+        diesel::insert_into(author::table)
+            .values(&data.authors)
+            .on_conflict_do_nothing()
+            .execute(c)
+            .await?;
+
+        diesel::insert_into(tag::table)
+            .values(&data.tags)
+            .on_conflict_do_nothing()
+            .execute(c)
+            .await?;
+
+        diesel::update(&BookId { id: *id })
+            .set(data.book)
+            .execute(c)
+            .await?;
+
+        if let Some((name, volume)) = data.series {
+            let series = Series {
+                name: name.clone(),
+                owner: user.id,
+                ongoing: Some(false),
+            };
+
+            diesel::insert_into(series::table)
+                .values(&series)
                 .on_conflict_do_nothing()
                 .execute(c)
                 .await?;
 
-            diesel::insert_into(tag::table)
-                .values(&data.tags)
-                .on_conflict_do_nothing()
+            let series_id = series::table
+                .filter(series::owner.eq(user.id).and(series::name.eq(&name)))
+                .select(series::id)
+                .first(c)
+                .await?;
+
+            let book_series = BookSeries {
+                book: *id,
+                series: series_id,
+                number: volume,
+            };
+
+            diesel::insert_into(bookseries::table)
+                .values(&book_series)
+                .on_conflict(bookseries::book)
+                .do_update()
+                .set(&book_series)
                 .execute(c)
                 .await?;
-
-            diesel::update(&BookId { id: *id })
-                .set(data.book)
-                .execute(c)
-                .await?;
-
-            if let Some((name, volume)) = data.series {
-                let series = Series {
-                    name: name.clone(),
-                    owner: user.id,
-                    ongoing: Some(false),
-                };
-
-                diesel::insert_into(series::table)
-                    .values(&series)
-                    .on_conflict_do_nothing()
-                    .execute(c)
-                    .await?;
-
-                let series_id = series::table
-                    .filter(series::owner.eq(user.id).and(series::name.eq(&name)))
-                    .select(series::id)
-                    .first(c)
-                    .await?;
-
-                let book_series = BookSeries {
-                    book: *id,
-                    series: series_id,
-                    number: volume,
-                };
-
-                diesel::insert_into(bookseries::table)
-                    .values(&book_series)
-                    .on_conflict(bookseries::book)
-                    .do_update()
-                    .set(&book_series)
-                    .execute(c)
-                    .await?;
-            }
-
-            let author_ids: Vec<i32> = author::table
-                .filter(author::name.eq_any(&data.authors))
-                .select(author::id)
-                .load(c)
-                .await?;
-
-            diesel::insert_into(bookauthor::table)
-                .values(
-                    &author_ids
-                        .into_iter()
-                        .map(|author| BookAuthor { book: *id, author })
-                        .collect::<Vec<_>>(),
-                )
-                .execute(c)
-                .await?;
-
-            let tag_ids: Vec<i32> = tag::table
-                .filter(tag::name.eq_any(&data.tags))
-                .select(tag::id)
-                .load(c)
-                .await?;
-
-            diesel::insert_into(booktag::table)
-                .values(
-                    &tag_ids
-                        .into_iter()
-                        .map(|tag| BookTag { book: *id, tag })
-                        .collect::<Vec<_>>(),
-                )
-                .execute(c)
-                .await?;
-
-            let image_dir = state.config.metadata.image_dir.join(user.id.to_string());
-
-            std::fs::create_dir_all(&image_dir)
-                .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
-
-            let mut image_path = image_dir.join(id.to_string());
-            image_path.set_extension("jpg");
-
-            if let Some(img) = data.image {
-                tokio::task::block_in_place(|| -> Result<_, RouteError> {
-                    let file = OpenOptions::new()
-                        .truncate(true)
-                        .write(true)
-                        .read(true)
-                        .open(&image_path)
-                        .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
-
-                    img.write_to(&mut BufWriter::new(file), image::ImageFormat::Jpeg)
-                        .map_err(RouteError::ImageSave)?;
-
-                    Ok(())
-                })?;
-            }
-
-            Ok::<_, RouteError>(())
         }
-        .scope_boxed()
+
+        let author_ids: Vec<i32> = author::table
+            .filter(author::name.eq_any(&data.authors))
+            .select(author::id)
+            .load(c)
+            .await?;
+
+        diesel::insert_into(bookauthor::table)
+            .values(
+                &author_ids
+                    .into_iter()
+                    .map(|author| BookAuthor { book: *id, author })
+                    .collect::<Vec<_>>(),
+            )
+            .execute(c)
+            .await?;
+
+        let tag_ids: Vec<i32> = tag::table
+            .filter(tag::name.eq_any(&data.tags))
+            .select(tag::id)
+            .load(c)
+            .await?;
+
+        diesel::insert_into(booktag::table)
+            .values(
+                &tag_ids
+                    .into_iter()
+                    .map(|tag| BookTag { book: *id, tag })
+                    .collect::<Vec<_>>(),
+            )
+            .execute(c)
+            .await?;
+
+        let image_dir = state.config.metadata.image_dir.join(user.id.to_string());
+
+        std::fs::create_dir_all(&image_dir)
+            .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
+
+        let mut image_path = image_dir.join(id.to_string());
+        image_path.set_extension("jpg");
+
+        if let Some(img) = data.image {
+            tokio::task::block_in_place(|| -> Result<_, RouteError> {
+                let file = OpenOptions::new()
+                    .truncate(true)
+                    .write(true)
+                    .read(true)
+                    .open(&image_path)
+                    .map_err(|e| RouteError::ImageSave(image::ImageError::IoError(e)))?;
+
+                img.write_to(&mut BufWriter::new(file), image::ImageFormat::Jpeg)
+                    .map_err(RouteError::ImageSave)?;
+
+                Ok(())
+            })?;
+        }
+
+        Ok::<_, RouteError>(())
     })
     .await?;
 

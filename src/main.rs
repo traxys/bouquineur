@@ -212,22 +212,22 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(routes::index))
         .route("/add", get(routes::add_book).post(routes::do_add_book))
         .route("/public/images/not_found", get(routes::image_not_found))
-        .route("/public/:user/images/:id", get(routes::image))
-        .route("/book/:id", get(routes::get_book))
+        .route("/public/{user}/images/{id}", get(routes::image))
+        .route("/book/{id}", get(routes::get_book))
         .route("/unread", get(routes::unread))
         .route(
-            "/book/:id/edit",
+            "/book/{id}/edit",
             get(routes::edit_book).post(routes::do_edit_book),
         )
         .route("/series", get(routes::series))
-        .route("/series/:id", get(routes::get_series))
+        .route("/series/{id}", get(routes::get_series))
         .route(
-            "/series/:id/edit",
+            "/series/{id}/edit",
             get(routes::series_edit).post(routes::do_series_edit),
         )
-        .route("/author/:id", get(routes::get_author))
+        .route("/author/{id}", get(routes::get_author))
         .route("/ongoing", get(routes::ongoing))
-        .route("/public/:user/ongoing", get(routes::ongoing_public))
+        .route("/public/{user}/ongoing", get(routes::ongoing_public))
         .route(
             "/profile",
             get(routes::profile).post(routes::do_edit_profile),

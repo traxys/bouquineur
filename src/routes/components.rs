@@ -347,7 +347,7 @@ pub fn series_cards(
                                         a .nav-link.fs-5 href=(format!("/series/{}", series.id)) {
                                             (series.name)
                                         }
-                                    } else {
+                                    } @else {
                                         (series.name)
                                     }
                                 }

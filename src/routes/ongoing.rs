@@ -80,7 +80,7 @@ async fn ongoing_core(state: State, user: User, private: bool) -> Result<maud::M
             h2 {
                 @if private {
                     "Ongoing Series"
-                } else {
+                } @else {
                     (format!("Ongoing Series ({})", user.name))
                 }
             }
@@ -98,7 +98,7 @@ async fn ongoing_core(state: State, user: User, private: bool) -> Result<maud::M
                                             a .nav-link.fs-5 href=(format!("/series/{}", missing.id)) {
                                                 (missing.name)
                                             }
-                                        } else {
+                                        } @else {
                                             (missing.name)
                                         }
                                     }

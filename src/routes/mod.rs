@@ -5,7 +5,6 @@ use std::{
 };
 
 use axum::{
-    async_trait,
     body::{Body, Bytes},
     extract::{
         multipart::{MultipartError, MultipartRejection},
@@ -185,57 +184,57 @@ fn base_page_with_head(body: Markup, head: Option<Markup>) -> Markup {
     html! {
         (maud::DOCTYPE)
         html lang="en" data-bs-theme="dark" {
-            head {
-                meta charset="utf-8";
-                meta name="viewport" content="width=device-width, initial-scale=1";
-                title { "Bouquineur" }
-                link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-                     rel="stylesheet"
-                     integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
-                     crossorigin="anonymous";
-                link rel="stylesheet"
-                     href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
-                     integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+"
-                     crossorigin="anonymous";
-                link rel="stylesheet"
-                     href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.css"
-                     integrity="sha512-GEMEzu9K8wXXaW527IHfGIOaTQ0hXxZPJXZOwGDIO+nrR9Z0ttJih1ZehiEoWY8xPtqzzD7pxAEnQInTZwn3MQ=="
-                     crossorigin="anonymous";
-                style type="text/css" {
-                    (maud::PreEscaped(r#"
-                        .awesomplete > ul {
-	                        z-index: 10;
-                        }
-                    "#))
-                }
-                @if let Some(head) = head {
-                    (head)
-                }
-            }
-            body {
-                (body)
-                script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"
-                       integrity="sha384-yW9Y7lGkfKYN+jnhSQpcumEsBkSCx/Ab9s2+rHyU5faxR81n4c2mhBw1K6TyFG2a"
-                       crossorigin="anonymous" {}
-                script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"
-                       integrity="sha384-MOAlrmENITvPLnTzISP6k/GAbCgTOuREHSbC1X5a3qcIHeHTNilNuzc7LfXVYKMO"
-                       crossorigin="anonymous" {}
-                script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-                       integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
-                       crossorigin="anonymous" {}
-                script src="https://unpkg.com/htmx.org@2.0.1"
-                       integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/"
-                       crossorigin="anonymous" {}
-                script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.min.js"
-                       integrity="sha512-Pc3/aEr2FIVZhHxe0RAC9SFrd+pxBJHN3pNJfJNTKc2XAFnXUjgQGIh6X935ePSXNMN6rFa3yftxSnZfJE8ZAg=="
-                       crossorigin="anonymous" async {}
-                script {
-                    (maud::PreEscaped(r#"
-                        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
-                        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
-                    "#))
-                }
-            }
+        head {
+        meta charset="utf-8";
+        meta name="viewport" content="width=device-width, initial-scale=1";
+        title { "Bouquineur" }
+        link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+        crossorigin="anonymous";
+        link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+"
+        crossorigin="anonymous";
+        link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.css"
+        integrity="sha512-GEMEzu9K8wXXaW527IHfGIOaTQ0hXxZPJXZOwGDIO+nrR9Z0ttJih1ZehiEoWY8xPtqzzD7pxAEnQInTZwn3MQ=="
+        crossorigin="anonymous";
+        style type="text/css" {
+        (maud::PreEscaped(r#"
+        .awesomplete > ul {
+        z-index: 10;
+        }
+        "#))
+        }
+        @if let Some(head) = head {
+        (head)
+        }
+        }
+        body {
+        (body)
+        script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"
+        integrity="sha384-yW9Y7lGkfKYN+jnhSQpcumEsBkSCx/Ab9s2+rHyU5faxR81n4c2mhBw1K6TyFG2a"
+        crossorigin="anonymous" {}
+        script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"
+        integrity="sha384-MOAlrmENITvPLnTzISP6k/GAbCgTOuREHSbC1X5a3qcIHeHTNilNuzc7LfXVYKMO"
+        crossorigin="anonymous" {}
+        script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous" {}
+        script src="https://unpkg.com/htmx.org@2.0.1"
+        integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/"
+        crossorigin="anonymous" {}
+        script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.7/awesomplete.min.js"
+        integrity="sha512-Pc3/aEr2FIVZhHxe0RAC9SFrd+pxBJHN3pNJfJNTKc2XAFnXUjgQGIh6X935ePSXNMN6rFa3yftxSnZfJE8ZAg=="
+        crossorigin="anonymous" async {}
+        script {
+        (maud::PreEscaped(r#"
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+        "#))
+        }
+        }
         }
     }
 }
@@ -247,34 +246,34 @@ fn base_page(body: Markup) -> Markup {
 fn raw_app_page(page: Option<Page>, user: &User, body: Markup) -> Markup {
     base_page(html! {
         .container-fluid {
-            header .d-flex
-                   .flex-wrap
-                   .align-items-center
-                   .justify-content-center
-                   .justify-content-md-between
-                   ."py-3"."mb-4" {
-                h2 ."col-md-3"."mb-2"."mb-md-0" {
-                    a .d-inline-flex.link-body-emphasis.text-decoration-none href="/" {
-                        i .bi.bi-book-half {}
-                    }
-                }
-                ul .nav.nav-pills."col-12".col-md-auto."mb-2".justify-content-center."mb-md-0" {
-                    @for p in Page::variants() {
-                        @let current = Some(*p) == page;
-                        li .nav-item {
-                            a .nav-link.active[current]
-                                aria-current=[current.then(|| "page")]
-                                href=(p.location()) {
-                                (p.name())
-                            }
-                        }
-                    }
-                }
-                ."col-md-3".text-end."me-2" {
-                    a href="/profile" .align-middle.link-light { (user.name) }
-                }
-            }
-            (body)
+        header .d-flex
+        .flex-wrap
+        .align-items-center
+        .justify-content-center
+        .justify-content-md-between
+        ."py-3"."mb-4" {
+        h2 ."col-md-3"."mb-2"."mb-md-0" {
+        a .d-inline-flex.link-body-emphasis.text-decoration-none href="/" {
+        i .bi.bi-book-half {}
+        }
+        }
+        ul .nav.nav-pills."col-12".col-md-auto."mb-2".justify-content-center."mb-md-0" {
+        @for p in Page::variants() {
+        @let current = Some(*p) == page;
+        li .nav-item {
+        a .nav-link.active[current]
+        aria-current=[current.then(|| "page")]
+        href=(p.location()) {
+        (p.name())
+        }
+        }
+        }
+        }
+        ."col-md-3".text-end."me-2" {
+        a href="/profile" .align-middle.link-light { (user.name) }
+        }
+        }
+        (body)
         }
     })
 }
@@ -283,7 +282,6 @@ fn app_page(page: Page, user: &User, body: Markup) -> Markup {
     raw_app_page(Some(page), user, body)
 }
 
-#[async_trait]
 impl FromRequestParts<Arc<AppState>> for User {
     type Rejection = RouteError;
 
@@ -326,7 +324,6 @@ pub(crate) struct BookInfo {
     tags: Vec<TagName>,
 }
 
-#[async_trait]
 impl FromRequest<Arc<AppState>> for BookInfo {
     type Rejection = RouteError;
 
@@ -525,8 +522,8 @@ pub(crate) async fn index(state: State, user: User) -> Result<maud::Markup, Rout
         &user,
         html! {
             .text-center {
-                h2 { "Books" }
-                (book_data)
+            h2 { "Books" }
+            (book_data)
             }
         },
     ))
@@ -593,8 +590,8 @@ pub(crate) async fn series(state: State, user: User) -> Result<maud::Markup, Rou
         &user,
         html! {
             .text-center {
-                h2 { "Series" }
-                (components::series_cards(&state, &user, &series, true))
+            h2 { "Series" }
+            (components::series_cards(&state, &user, &series, true))
             }
         },
     ))

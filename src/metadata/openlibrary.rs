@@ -1,5 +1,5 @@
 use base64::prelude::*;
-use chrono::NaiveDate;
+use chrono::{Local, NaiveDate};
 use reqwest::StatusCode;
 
 use crate::OpenLibraryConfig;
@@ -185,13 +185,13 @@ pub(super) async fn fetch_metadata(
     let published = match edition.publish_date {
         None => None,
         Some(v) => match parse_datetime::parse_datetime(&v) {
-            Err(_) => match human_date_parser::from_human_time(&v) {
+            Err(_) => match human_date_parser::from_human_time(&v, Local::now().naive_local()) {
                 Err(_) => match v.parse::<i32>() {
                     Err(_) => None,
                     Ok(v) => NaiveDate::from_ymd_opt(v, 1, 1),
                 },
                 Ok(v) => match v {
-                    human_date_parser::ParseResult::DateTime(dt) => Some(dt.date_naive()),
+                    human_date_parser::ParseResult::DateTime(dt) => Some(dt.date()),
                     human_date_parser::ParseResult::Date(d) => Some(d),
                     human_date_parser::ParseResult::Time(_) => None,
                 },
