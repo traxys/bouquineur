@@ -33,6 +33,7 @@
             ++ (with pkgs; [
               diesel-cli
               calibre
+              postgresql.lib
             ]);
           RUST_PATH = "${rust}";
           RUST_DOC_PATH = "${rust}/share/doc/rust/html/std/index.html";
